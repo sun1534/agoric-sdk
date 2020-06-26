@@ -7,9 +7,10 @@ import { test } from 'tape-promise/tape';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import bundleSource from '@agoric/bundle-source';
 
-import { makeZoe } from '../../../src/zoe';
+import { makeZoe } from '../../..';
 import { setup } from '../setupBasicMints';
 import { makeGetInstanceHandle } from '../../../src/clientSupport';
+import fakeVatAdmin from './fakeVatAdmin';
 
 const barter = `${__dirname}/../../../src/contracts/barterExchange`;
 
@@ -24,7 +25,7 @@ test('barter with valid offers', async t => {
     moola,
     simoleans,
   } = setup();
-  const zoe = makeZoe();
+  const zoe = makeZoe(fakeVatAdmin);
   const inviteIssuer = zoe.getInviteIssuer();
   const getInstanceHandle = makeGetInstanceHandle(inviteIssuer);
 

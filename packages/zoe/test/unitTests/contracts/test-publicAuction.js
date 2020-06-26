@@ -6,9 +6,10 @@ import { test } from 'tape-promise/tape';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import bundleSource from '@agoric/bundle-source';
 
-import { makeZoe } from '../../../src/zoe';
+import { makeZoe } from '../../..';
 import { setup } from '../setupBasicMints';
 import { setupMixed } from '../setupMixedMints';
+import fakeVatAdmin from './fakeVatAdmin';
 
 const publicAuctionRoot = `${__dirname}/../../../src/contracts/publicAuction`;
 
@@ -16,7 +17,7 @@ test('zoe - secondPriceAuction w/ 3 bids', async t => {
   t.plan(34);
   try {
     const { moolaR, simoleanR, moola, simoleans } = setup();
-    const zoe = makeZoe();
+    const zoe = makeZoe(fakeVatAdmin);
     const inviteIssuer = zoe.getInviteIssuer();
 
     // Setup Alice
@@ -317,7 +318,7 @@ test('zoe - secondPriceAuction w/ 3 bids - alice exits onDemand', async t => {
   t.plan(10);
   try {
     const { moolaR, simoleanR, moola, simoleans } = setup();
-    const zoe = makeZoe();
+    const zoe = makeZoe(fakeVatAdmin);
 
     // Setup Alice
     const aliceMoolaPayment = moolaR.mint.mintPayment(moola(1));
@@ -455,7 +456,7 @@ test('zoe - secondPriceAuction non-fungible asset', async t => {
     cryptoCats,
     moola,
   } = setupMixed();
-  const zoe = makeZoe();
+  const zoe = makeZoe(fakeVatAdmin);
   const inviteIssuer = zoe.getInviteIssuer();
 
   // Setup Alice

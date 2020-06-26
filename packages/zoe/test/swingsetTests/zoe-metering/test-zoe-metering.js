@@ -36,7 +36,8 @@ const infiniteInstallLoopLog = [
   'installing infiniteInstallLoop',
   'error: RangeError: Compute meter exceeded',
 ];
-test('zoe - metering - infinite loop in installation', async t => {
+// TODO(warner): re-enable when Agoric/SES-shim#377 is fixed.
+test.skip('zoe - metering - infinite loop in installation', async t => {
   t.plan(1);
   try {
     const dump = await main(['infiniteInstallLoop']);
@@ -51,7 +52,8 @@ const infiniteInstanceLoopLog = [
   'instantiating infiniteInstanceLoop',
   'error: RangeError: Compute meter exceeded',
 ];
-test('zoe - metering - infinite loop in instantiation', async t => {
+// TODO(warner): re-enable when Agoric/SES-shim#377 is fixed.
+test.skip('zoe - metering - infinite loop in instantiation', async t => {
   t.plan(1);
   try {
     const dump = await main(['infiniteInstanceLoop']);
@@ -67,7 +69,8 @@ const infiniteTestLoopLog = [
   'invoking infiniteTestLoop.doTest()',
   'error: RangeError: Compute meter exceeded',
 ];
-test('zoe - metering - infinite loop in contract method', async t => {
+// TODO(warner): re-enable when Agoric/SES-shim#377 is fixed.
+test.skip('zoe - metering - infinite loop in contract method', async t => {
   t.plan(1);
   try {
     const dump = await main(['infiniteTestLoop']);
@@ -83,7 +86,8 @@ const testBuiltinsLog = [
   'invoking testBuiltins.doTest()',
   'error: RangeError: Allocate meter exceeded',
 ];
-test('zoe - metering - expensive builtins in contract method', async t => {
+// TODO(warner): re-enable when Agoric/SES-shim#377 is fixed.
+test.skip('zoe - metering - expensive builtins in contract method', async t => {
   t.plan(1);
   try {
     const dump = await main(['testBuiltins']);

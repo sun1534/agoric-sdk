@@ -6,15 +6,16 @@ import { test } from 'tape-promise/tape';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import bundleSource from '@agoric/bundle-source';
 
-import { makeZoe } from '../../../src/zoe';
+import { makeZoe } from '../../..';
 import { setup } from '../setupBasicMints';
+import fakeVatAdmin from './fakeVatAdmin';
 
 const contractRoot = `${__dirname}/useObjExample`;
 
 test('zoe - useObj', async t => {
   t.plan(3);
   const { moolaIssuer, moolaMint, moola } = setup();
-  const zoe = makeZoe();
+  const zoe = makeZoe(fakeVatAdmin);
 
   // pack the contract
   const bundle = await bundleSource(contractRoot);

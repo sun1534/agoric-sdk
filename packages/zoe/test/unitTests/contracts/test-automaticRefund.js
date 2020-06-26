@@ -6,10 +6,11 @@ import { test } from 'tape-promise/tape';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import bundleSource from '@agoric/bundle-source';
 
-import { makeZoe } from '../../../src/zoe';
+import { makeZoe } from '../../..';
 import { setup } from '../setupBasicMints';
 import { makeGetInstanceHandle } from '../../../src/clientSupport';
 import { setupNonFungible } from '../setupNonFungibleMints';
+import fakeVatAdmin from './fakeVatAdmin';
 
 const automaticRefundRoot = `${__dirname}/../../../src/contracts/automaticRefund`;
 
@@ -18,7 +19,7 @@ test('zoe - simplest automaticRefund', async t => {
   try {
     // Setup zoe and mints
     const { moolaR, moola } = setup();
-    const zoe = makeZoe();
+    const zoe = makeZoe(fakeVatAdmin);
     // Pack the contract.
     const bundle = await bundleSource(automaticRefundRoot);
     const installationHandle = await zoe.install(bundle);
@@ -64,7 +65,7 @@ test('zoe - automaticRefund same issuer', async t => {
   try {
     // Setup zoe and mints
     const { moolaR, moola } = setup();
-    const zoe = makeZoe();
+    const zoe = makeZoe(fakeVatAdmin);
     // Pack the contract.
     const bundle = await bundleSource(automaticRefundRoot);
     const installationHandle = await zoe.install(bundle);
@@ -113,7 +114,7 @@ test('zoe with automaticRefund', async t => {
   try {
     // Setup zoe and mints
     const { moolaR, simoleanR, moola, simoleans } = setup();
-    const zoe = makeZoe();
+    const zoe = makeZoe(fakeVatAdmin);
     const inviteIssuer = zoe.getInviteIssuer();
     const getInstanceHandle = makeGetInstanceHandle(inviteIssuer);
 
@@ -259,7 +260,7 @@ test('multiple instances of automaticRefund for the same Zoe', async t => {
   try {
     // Setup zoe and mints
     const { moolaR, simoleanR, moola, simoleans } = setup();
-    const zoe = makeZoe();
+    const zoe = makeZoe(fakeVatAdmin);
 
     // Setup Alice
     const aliceMoolaPayment = moolaR.mint.mintPayment(moola(30));
@@ -369,7 +370,7 @@ test('zoe - alice tries to complete after completion has already occurred', asyn
   try {
     // Setup zoe and mints
     const { moolaR, simoleanR, moola, simoleans } = setup();
-    const zoe = makeZoe();
+    const zoe = makeZoe(fakeVatAdmin);
 
     // Setup Alice
     const aliceMoolaPayment = moolaR.mint.mintPayment(moola(3));
@@ -402,10 +403,7 @@ test('zoe - alice tries to complete after completion has already occurred', asyn
 
     await outcomeP;
 
-    t.throws(
-      () => completeObj.complete(),
-      /Error: offer has already completed/,
-    );
+    t.throws(() => completeObj.complete(), /Error: Offer is not active/);
 
     const payout = await payoutP;
     const moolaPayout = await payout.ContributionA;
@@ -442,7 +440,7 @@ test('zoe - automaticRefund non-fungible', async t => {
   // Setup zoe and mints
   const { ccIssuer, ccMint, cryptoCats } = setupNonFungible();
 
-  const zoe = makeZoe();
+  const zoe = makeZoe(fakeVatAdmin);
   // Pack the contract.
   const bundle = await bundleSource(automaticRefundRoot);
   const installationHandle = await zoe.install(bundle);

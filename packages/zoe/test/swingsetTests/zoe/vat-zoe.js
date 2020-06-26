@@ -1,10 +1,9 @@
 /* global harden */
 
-import { makeZoe } from '../../../src/zoe';
+import { makeZoe } from '../../..';
 
 export function buildRootObject(_vatPowers) {
-  const zoe = makeZoe();
   return harden({
-    getZoe: () => zoe,
+    buildZoe: vatAdminSvc => makeZoe(vatAdminSvc),
   });
 }

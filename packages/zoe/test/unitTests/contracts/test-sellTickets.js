@@ -5,11 +5,13 @@ import '@agoric/install-ses';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { test } from 'tape-promise/tape';
 // eslint-disable-next-line import/no-extraneous-dependencies
+
 import bundleSource from '@agoric/bundle-source';
 import makeIssuerKit from '@agoric/ertp';
 import { E } from '@agoric/eventual-send';
+import fakeVatAdmin from './fakeVatAdmin';
 
-import { makeZoe } from '../../../src/zoe';
+import { makeZoe } from '../../..';
 import { defaultAcceptanceMsg } from '../../../src/contractSupport';
 
 const mintAndSellNFTRoot = `${__dirname}/../../../src/contracts/mintAndSellNFT`;
@@ -17,7 +19,7 @@ const sellItemsRoot = `${__dirname}/../../../src/contracts/sellItems`;
 
 test(`mint and sell tickets for multiple shows`, async t => {
   // Setup initial conditions
-  const zoe = makeZoe();
+  const zoe = makeZoe(fakeVatAdmin);
 
   const mintAndSellNFTBundle = await bundleSource(mintAndSellNFTRoot);
   const mintAndSellNFTInstallationHandle = await E(zoe).install(
@@ -151,7 +153,7 @@ test(`mint and sell opera tickets`, async t => {
     amountMath: { make: moola },
   } = makeIssuerKit('moola');
 
-  const zoe = makeZoe();
+  const zoe = makeZoe(fakeVatAdmin);
 
   const mintAndSellNFTBundle = await bundleSource(mintAndSellNFTRoot);
   const mintAndSellNFTInstallationHandle = await E(zoe).install(

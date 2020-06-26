@@ -8,6 +8,7 @@ import bundleSource from '@agoric/bundle-source';
 
 import { makeZoe } from '../../..';
 import { setup } from '../setupBasicMints';
+import fakeVatAdmin from './fakeVatAdmin';
 
 const grifterRoot = `${__dirname}/grifter`;
 
@@ -15,7 +16,7 @@ test('zoe - grifter tries to steal; prevented by offer safety', async t => {
   t.plan(1);
   // Setup zoe and mints
   const { moola, moolaR, moolaMint, bucksR, bucks } = setup();
-  const zoe = makeZoe();
+  const zoe = makeZoe(fakeVatAdmin);
   // Pack the contract.
   const bundle = await bundleSource(grifterRoot);
   const installationHandle = await zoe.install(bundle);

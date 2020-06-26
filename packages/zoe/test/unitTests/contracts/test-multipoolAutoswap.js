@@ -9,8 +9,9 @@ import bundleSource from '@agoric/bundle-source';
 import makeAmountMath from '@agoric/ertp/src/amountMath';
 import makeIssuerKit from '@agoric/ertp';
 import { E } from '@agoric/eventual-send';
+import fakeVatAdmin from './fakeVatAdmin';
 
-import { makeZoe } from '../../../src/zoe';
+import { makeZoe } from '../../..';
 import { setup } from '../setupBasicMints';
 
 const multipoolAutoswapRoot = `${__dirname}/../../../src/contracts/multipoolAutoswap`;
@@ -19,7 +20,7 @@ test('multipoolAutoSwap with valid offers', async t => {
   t.plan(35);
   try {
     const { moolaR, simoleanR, moola, simoleans } = setup();
-    const zoe = makeZoe();
+    const zoe = makeZoe(fakeVatAdmin);
     const inviteIssuer = zoe.getInviteIssuer();
 
     // Set up central token

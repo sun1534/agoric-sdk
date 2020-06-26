@@ -6,9 +6,10 @@ import { test } from 'tape-promise/tape';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import bundleSource from '@agoric/bundle-source';
 
-import { makeZoe } from '../../../src/zoe';
+import { makeZoe } from '../../..';
 import { setup } from '../setupBasicMints';
 import { setupNonFungible } from '../setupNonFungibleMints';
+import fakeVatAdmin from './fakeVatAdmin';
 
 const atomicSwapRoot = `${__dirname}/../../../src/contracts/atomicSwap`;
 
@@ -22,7 +23,7 @@ test('zoe - atomicSwap', async t => {
     moola,
     simoleans,
   } = setup();
-  const zoe = makeZoe();
+  const zoe = makeZoe(fakeVatAdmin);
   const inviteIssuer = zoe.getInviteIssuer();
 
   // pack the contract
@@ -149,7 +150,7 @@ test('zoe - non-fungible atomicSwap', async t => {
     createRpgItem,
   } = setupNonFungible();
 
-  const zoe = makeZoe();
+  const zoe = makeZoe(fakeVatAdmin);
   const inviteIssuer = zoe.getInviteIssuer();
 
   // pack the contract
@@ -274,7 +275,7 @@ test('zoe - non-fungible atomicSwap', async t => {
 test('zoe - atomicSwap like-for-like', async t => {
   t.plan(13);
   const { moolaIssuer, moolaMint, moola } = setup();
-  const zoe = makeZoe();
+  const zoe = makeZoe(fakeVatAdmin);
   const inviteIssuer = zoe.getInviteIssuer();
 
   // pack the contract

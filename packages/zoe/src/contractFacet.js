@@ -1,12 +1,21 @@
+// This is the Zoe contract facet. Each time we make a new instance of a
+// contract we will start by creating a new vat and running this code in it. In
+// order to install this code in a vat, Zoe needs to import a bundle containing
+// this code. We will eventually have an automated process, but for now, every
+// time this file is edited, the bundle must be manually rebuilt with
+// `yarn build-zcfBundle`.
+
 /* global harden */
 // @ts-check
 
 import { assert, details, q } from '@agoric/assert';
-import { assertKeywordName, getKeywords } from './cleanProposal';
+import { E } from '@agoric/eventual-send';
 import { isOfferSafe } from './offerSafety';
 import { areRightsConserved } from './rightsConservation';
-import { makeTables } from './state';
-import { filterObj, filterFillAmounts } from './objArrayConversion';
+import { assertKeywordName, getKeywords, cleanKeywords } from './cleanProposal';
+import { makeContractTables } from './state';
+import { filterObj, arrayToObj, filterFillAmounts } from './objArrayConversion';
+import { evalContractBundle } from './evalContractCode';
 
 /**
  * @typedef {Object} ContractFacet
@@ -31,7 +40,9 @@ import { filterObj, filterFillAmounts } from './objArrayConversion';
  * @property {() => InstanceRecord} getInstanceRecord
  * @property {(issuer: Issuer) => Brand} getBrandForIssuer
  * @property {(brand: Brand) => AmountMath} getAmountMath
- *
+ * @property {() => Promise<Notifier>} getOfferNotifier
+ * @property {() => VatAdmin} getVatAdmin
+` *
  * @callback Reallocate
  * The contract can propose a reallocation of extents across offers
  * by providing two parallel arrays: offerHandles and newAllocations.
@@ -103,7 +114,6 @@ import { filterObj, filterFillAmounts } from './objArrayConversion';
  * @param {OfferHandle} offerHandle
  * @returns {OfferOutcome}
  *
- *
  * @callback AddNewIssuer
  * Informs Zoe about an issuer and returns a promise for acknowledging
  * when the issuer is added and ready.
@@ -120,37 +130,56 @@ import { filterObj, filterFillAmounts } from './objArrayConversion';
  */
 
 /**
- * @typedef {import('./rightsConservation').areRightsConserved} areRightsConserved
+ * @typedef {Object} VatAdmin
+ * A powerful object that can be used to terminate the vat in which a contract
+ * is running, to get statistics, or to be notified when it terminates. The
+ * VatAdmin object is only available to the contract from within the contract so
+ * that clients of the contract can tell (by getting the source code from Zoe
+ * using the instanceHandle) what use the contract makes of it. If they want to
+ * be assured of discretion, or want to know that the contract doesn't have the
+ * ability to call terminate(), Zoe makes this visible.
+ *
+ * @property {() => Object} done
+ * provides a promise that will be fullfilled when the contract is terminated.
+ * @property {() => undefined} terminate
+ * kills the vat in which the contract is running
+ * @property {() => Object} adminData
+ * provides some statistics about the vat in which the contract is running.
  */
 
 /**
  * Create the contract facet.
  *
- * @param {InstanceHandle} instanceHandle The instance for which to create the facet
  * @returns {ContractFacet} The returned facet
  */
-const makeContractFacet = instanceHandle => {
-  const { offerTable, issuerTable, instanceTable } = makeTables();
+export function buildRootObject(_vatPowers) {
+  let publicAPI;
+  let zoeForZcf;
+
+  // contains instanceHandle, installationHandle, terms, issuerKeywordRecord,
+  // adminNode, and brandKeywordRecord. It could be converted to individual
+  // fields.
+  const instanceRecord = {};
+  let activeOfferHandles = [];
+
+  const { offerTable, issuerTable } = makeContractTables();
+
+  let inviteIssuer;
 
   const getAmountMathForBrand = brand => issuerTable.get(brand).amountMath;
 
-  const assertOffersHaveInstanceHandle = (
-    offerHandles,
-    expectedInstanceHandle,
-  ) => {
-    offerHandles.forEach(offerHandle => {
+  const assertOffersAreActive = candidateOfferHandles =>
+    candidateOfferHandles.forEach(offerHandle =>
       assert(
-        offerTable.get(offerHandle).instanceHandle === expectedInstanceHandle,
-        details`contract instances can only access their own associated offers`,
-      );
-    });
-  };
-
-  const removePurse = issuerRecord =>
-    filterObj(issuerRecord, ['issuer', 'brand', 'amountMath']);
+        activeOfferHandles.includes(offerHandle),
+        details`Offer is not active`,
+      ),
+    );
 
   const removeAmountsAndNotifier = offerRecord =>
     filterObj(offerRecord, ['handle', 'instanceHandle', 'proposal']);
+  const removePurse = issuerRecord =>
+    filterObj(issuerRecord, ['issuer', 'brand', 'amountMath']);
 
   const doGetCurrentAllocation = (offerHandle, brandKeywordRecord) => {
     const { currentAllocation } = offerTable.get(offerHandle);
@@ -176,148 +205,278 @@ const makeContractFacet = instanceHandle => {
     );
   };
 
-  /**
-   * @type {ContractFacet}
-   */
-  const contractFacet = harden({
-    reallocate: (offerHandles, newAllocations) => {
-      assertOffersHaveInstanceHandle(offerHandles, instanceHandle);
-      // We may want to handle this with static checking instead.
-      // Discussion at: https://github.com/Agoric/agoric-sdk/issues/1017
-      assert(
-        offerHandles.length >= 2,
-        details`reallocating must be done over two or more offers`,
-      );
-      assert(
-        offerHandles.length === newAllocations.length,
-        details`There must be as many offerHandles as entries in newAllocations`,
-      );
+  const reallocate = (offerHandles, newAllocations) => {
+    assertOffersAreActive(offerHandles);
+    // We may want to handle this with static checking instead.
+    // Discussion at: https://github.com/Agoric/agoric-sdk/issues/1017
+    assert(
+      offerHandles.length >= 2,
+      details`reallocating must be done over two or more offers`,
+    );
+    assert(
+      offerHandles.length === newAllocations.length,
+      details`There must be as many offerHandles as entries in newAllocations`,
+    );
 
-      // 1) Ensure 'offer safety' for each offer separately.
-      const makeOfferSafeReallocation = (offerHandle, newAllocation) => {
-        const { proposal, currentAllocation } = offerTable.get(offerHandle);
-        const reallocation = harden({
-          ...currentAllocation,
-          ...newAllocation,
-        });
+    // 1) Ensure 'offer safety' for each offer separately.
+    const makeOfferSafeReallocation = (offerHandle, newAllocation) => {
+      const { proposal, currentAllocation } = offerTable.get(offerHandle);
+      const reallocation = harden({
+        ...currentAllocation,
+        ...newAllocation,
+      });
 
+      assert(
+        isOfferSafe(getAmountMathForBrand, proposal, reallocation),
+        details`The reallocation was not offer safe`,
+      );
+      return reallocation;
+    };
+
+    // Make the reallocation and test for offer safety by comparing the
+    // reallocation to the original proposal.
+    const reallocations = offerHandles.map((offerHandle, i) =>
+      makeOfferSafeReallocation(offerHandle, newAllocations[i]),
+    );
+
+    // 2. Ensure that rights are conserved overall.
+    const flattened = arr => [].concat(...arr);
+    const flattenAllocations = allocations =>
+      flattened(allocations.map(allocation => Object.values(allocation)));
+
+    const currentAllocations = offerTable
+      .getOffers(offerHandles)
+      .map(({ currentAllocation }) => currentAllocation);
+    const previousAmounts = flattenAllocations(currentAllocations);
+    const newAmounts = flattenAllocations(reallocations);
+
+    assert(
+      areRightsConserved(getAmountMathForBrand, previousAmounts, newAmounts),
+      details`Rights are not conserved in the proposed reallocation`,
+    );
+
+    // 3. Save the reallocations.
+    offerTable.updateAmounts(offerHandles, reallocations);
+    E(zoeForZcf).updateAmounts(offerHandles, reallocations);
+  };
+
+  const addNewIssuer = (issuerP, keyword) =>
+    issuerTable.getPromiseForIssuerRecord(issuerP).then(issuerRecord => {
+      E(zoeForZcf).addNewIssuer(issuerP, keyword);
+      assertKeywordName(keyword);
+      assert(
+        !getKeywords(instanceRecord.issuerKeywordRecord).includes(keyword),
+        details`keyword ${keyword} must be unique`,
+      );
+      const newIssuerKeywordRecord = {
+        ...instanceRecord.issuerKeywordRecord,
+        [keyword]: issuerRecord.issuer,
+      };
+      const newBrandKeywordRecord = {
+        ...instanceRecord.brandKeywordRecord,
+        [keyword]: issuerRecord.brand,
+      };
+      instanceRecord.brandKeywordRecord = newBrandKeywordRecord;
+      instanceRecord.issuerKeywordRecord = newIssuerKeywordRecord;
+
+      return removePurse(issuerRecord);
+    });
+
+  function completeOffers(offerHandlesToDrop) {
+    assertOffersAreActive(offerHandlesToDrop);
+    offerTable.deleteOffers(offerHandlesToDrop);
+    activeOfferHandles = activeOfferHandles.filter(
+      x => !offerHandlesToDrop.includes(x),
+    );
+    return E(zoeForZcf).completeOffers(offerHandlesToDrop);
+  }
+
+  /** @type {ContractFacet} */
+  const makeContractFacet = zoeService =>
+    harden({
+      reallocate,
+      addNewIssuer,
+      complete: completeOffers,
+      makeInvitation: (offerHook, inviteDesc, options = harden({})) => {
+        const inviteCallback = harden({ invoke: offerHook });
+        return E(zoeForZcf).makeInvitation(inviteCallback, inviteDesc, options);
+      },
+      initPublicAPI: newPublicAPI => {
         assert(
-          isOfferSafe(getAmountMathForBrand, proposal, reallocation),
-          details`The reallocation was not offer safe`,
+          publicAPI === undefined,
+          details`the publicAPI has already been initialized`,
         );
-        return reallocation;
+        publicAPI = newPublicAPI;
+        E(zoeForZcf).updatePublicAPI(newPublicAPI);
+      },
+
+      // The methods below are pure and have no side-effects //
+      getZoeService: () => zoeService,
+
+      getInviteIssuer: () => inviteIssuer,
+
+      getOfferNotifier: E(zoeService).getOfferNotifier,
+
+      getOfferStatuses: offerHandles => {
+        const { active, inactive } = offerTable.getOfferStatuses(offerHandles);
+        return harden({ active, inactive });
+      },
+      isOfferActive: offerHandle => {
+        const isActive = offerTable.isOfferActive(offerHandle);
+        // if offer isn't present, we do not want to throw.
+        return isActive;
+      },
+      getOffers: offerHandles => {
+        assertOffersAreActive(offerHandles);
+        return offerTable.getOffers(offerHandles).map(removeAmountsAndNotifier);
+      },
+      getOffer: offerHandle => {
+        assertOffersAreActive(harden([offerHandle]));
+        return removeAmountsAndNotifier(offerTable.get(offerHandle));
+      },
+      getCurrentAllocation: (offerHandle, brandKeywordRecord) => {
+        assertOffersAreActive(harden([offerHandle]));
+        return doGetCurrentAllocation(offerHandle, brandKeywordRecord);
+      },
+      getCurrentAllocations: (offerHandles, brandKeywordRecords) => {
+        assertOffersAreActive(offerHandles);
+        return doGetCurrentAllocations(offerHandles, brandKeywordRecords);
+      },
+      getInstanceRecord: () => instanceRecord,
+      getBrandForIssuer: issuer => issuerTable.brandFromIssuer(issuer),
+      getAmountMath: getAmountMathForBrand,
+      getVatAdmin: instanceRecord.adminNode,
+    });
+
+  /**
+   * @typedef {import('@agoric/zoe').CompleteObj} CompleteObj
+   *
+   * @typedef {Object} ZcfForZoe
+   * The facet ZCF presents to Zoe.
+   *
+   * @property {(OfferHandle, Proposal, Allocation) => CompleteObj} addOffer
+   * Add a single offer to this contract instance.
+   *
+   * @return CompleteObj
+   */
+  const zcfForZoe = harden({
+    addOffer: (offerHandle, proposal, allocation) => {
+      const ignoringUpdater = harden({
+        updateState: () => {},
+        resolve: () => {},
+      });
+      const offerRecord = {
+        instanceHandle: instanceRecord.instanceHandle,
+        proposal,
+        currentAllocation: allocation,
+        notifier: undefined,
+        updater: ignoringUpdater,
       };
 
-      // Make the reallocation and test for offer safety by comparing the
-      // reallocation to the original proposal.
-      const reallocations = offerHandles.map((offerHandle, i) =>
-        makeOfferSafeReallocation(offerHandle, newAllocations[i]),
-      );
+      const { exit } = proposal;
+      const [exitKind] = Object.getOwnPropertyNames(exit);
 
-      // 2. Ensure that rights are conserved overall.
-      const flattened = arr => [].concat(...arr);
-      const flattenAllocations = allocations =>
-        flattened(allocations.map(allocation => Object.values(allocation)));
+      let completeObj;
+      const completeOffer = () => {
+        return completeOffers(harden([offerHandle]));
+      };
 
-      const currentAllocations = offerTable
-        .getOffers(offerHandles)
-        .map(({ currentAllocation }) => currentAllocation);
-      const previousAmounts = flattenAllocations(currentAllocations);
-      const newAmounts = flattenAllocations(reallocations);
-
-      assert(
-        areRightsConserved(
-          getAmountMathForBrand,
-          previousAmounts,
-          newAmounts,
-        ),
-        details`Rights are not conserved in the proposed reallocation`,
-      );
-
-      // 3. Save the reallocations.
-      offerTable.updateAmounts(offerHandles, reallocations);
-    },
-
-    complete: offerHandles => {
-      assertOffersHaveInstanceHandle(offerHandles, instanceHandle);
-      return completeOffers(instanceHandle, offerHandles);
-    },
-
-    addNewIssuer: (issuerP, keyword) =>
-      issuerTable.getPromiseForIssuerRecord(issuerP).then(issuerRecord => {
-        assertKeywordName(keyword);
-        const { issuerKeywordRecord, brandKeywordRecord } = instanceTable.get(
-          instanceHandle,
+      if (exitKind === 'afterDeadline') {
+        // Automatically complete offer after deadline.
+        E(exit.afterDeadline.timer).setWakeup(
+          exit.afterDeadline.deadline,
+          harden({
+            wake: () => completeOffer(),
+          }),
         );
+      } else if (exitKind === 'onDemand') {
+        // Add to offerResult an object with a complete method to support
+        // complete offer on demand. Note: we cannot add the `completeOffer`
+        // function directly to the offerResult because our marshalling layer
+        // only allows two kinds of objects: records (no methods and only
+        // data) and presences (local proxies for objects that may have
+        // methods).
+        completeObj = {
+          complete: () => completeOffer(),
+        };
+      } else {
+        // if exitRule.kind is 'waived' the user has no ability to complete
+        // on demand
         assert(
-          !getKeywords(issuerKeywordRecord).includes(keyword),
-          details`keyword ${keyword} must be unique`,
+          exitKind === 'waived',
+          details`exit kind was not recognized: ${q(exitKind)}`,
         );
-        const newIssuerKeywordRecord = {
-          ...issuerKeywordRecord,
-          [keyword]: issuerRecord.issuer,
-        };
-        const newBrandKeywordRecord = {
-          ...brandKeywordRecord,
-          [keyword]: issuerRecord.brand,
-        };
-        instanceTable.update(instanceHandle, {
-          issuerKeywordRecord: newIssuerKeywordRecord,
-          brandKeywordRecord: newBrandKeywordRecord,
-        });
-        return removePurse(issuerRecord);
-      }),
-
-    initPublicAPI: publicAPI => {
-      const { publicAPI: oldPublicAPI } = instanceTable.get(instanceHandle);
-      assert(
-        oldPublicAPI === undefined,
-        details`the publicAPI has already been initialized`,
-      );
-      instanceTable.update(instanceHandle, { publicAPI });
-    },
-
-    // eslint-disable-next-line no-use-before-define
-    getZoeService: () => zoeService,
-
-    // The methods below are pure and have no side-effects //
-    getInviteIssuer: () => inviteIssuer,
-
-    getOfferNotifier: offerHandle => offerTable.get(offerHandle).notifier,
-    getOfferStatuses: offerHandles => {
-      const { active, inactive } = offerTable.getOfferStatuses(offerHandles);
-      assertOffersHaveInstanceHandle(active, instanceHandle);
-      return harden({ active, inactive });
-    },
-    isOfferActive: offerHandle => {
-      const isActive = offerTable.isOfferActive(offerHandle);
-      // if offer isn't present, we do not want to throw.
-      if (isActive) {
-        assertOffersHaveInstanceHandle(harden([offerHandle]), instanceHandle);
       }
-      return isActive;
+      offerTable.create(offerRecord, offerHandle);
+      activeOfferHandles.push(offerHandle);
+      return completeObj;
     },
-    getOffers: offerHandles => {
-      assertOffersHaveInstanceHandle(offerHandles, instanceHandle);
-      return offerTable.getOffers(offerHandles).map(removeAmountsAndNotifier);
-    },
-    getOffer: offerHandle => {
-      assertOffersHaveInstanceHandle(harden([offerHandle]), instanceHandle);
-      return removeAmountsAndNotifier(offerTable.get(offerHandle));
-    },
-    getCurrentAllocation: (offerHandle, brandKeywordRecord) => {
-      assertOffersHaveInstanceHandle(harden([offerHandle]), instanceHandle);
-      return doGetCurrentAllocation(offerHandle, brandKeywordRecord);
-    },
-    getCurrentAllocations: (offerHandles, brandKeywordRecords) => {
-      assertOffersHaveInstanceHandle(offerHandles, instanceHandle);
-      return doGetCurrentAllocations(offerHandles, brandKeywordRecords);
-    },
-    getInstanceRecord: () => instanceTable.get(instanceHandle),
-    getBrandForIssuer: issuer => issuerTable.brandFromIssuer(issuer),
-    getAmountMath: getAmountMathForBrand,
   });
-  return contractFacet;
-};
 
-export { makeContractFacet };
+  /**
+   * Makes a contract instance from an installation and returns a
+   * unique handle for the instance that can be shared, as well as
+   * other information, such as the terms used in the instance.
+   * @param zoeService - The canonical Zoe service in case the contract wants it
+   * @param zoeInner - An inner facet of Zoe for the contractFacet's use
+   * @param  {object} installationHandle - the unique handle for the
+   * installation
+   * @param {Object.<string,Issuer>} issuerKeywordRecord - a record mapping
+   * keyword keys to issuer values
+   * @param  {object} terms - optional, arguments to the contract. These
+   * arguments depend on the contract.
+   * @param instanceHandle, the Zoe handle for this instance
+   * @param bundle, an object containing source code and moduleFormat
+   * @param adminNode, the adminNode for the vat, which has done(), terminate()
+   *    and adminData()
+   * @param inviteIssuerIn, Zoe's inviteIssuer, for the contract to use
+   * @returns { Promise<Invite>, ZcfForZoe }
+   */
+  const startContract = (
+    zoeService,
+    zoeInner,
+    installationHandle,
+    issuerKeywordRecord = harden({}),
+    terms = harden({}),
+    instanceHandle,
+    bundle,
+    adminNode,
+    inviteIssuerIn,
+  ) => {
+    zoeForZcf = zoeInner;
+    // make a contract facet
+    const contractCode = evalContractBundle(bundle);
+    inviteIssuer = inviteIssuerIn;
+
+    const cleanedKeywords = cleanKeywords(issuerKeywordRecord);
+    const issuersP = cleanedKeywords.map(
+      keyword => issuerKeywordRecord[keyword],
+    );
+    instanceRecord.instanceHandle = instanceHandle;
+    instanceRecord.installationHandle = installationHandle;
+    instanceRecord.terms = terms;
+    instanceRecord.adminNode = adminNode;
+
+    // invoke contract and return inner facet to Zoe.
+    const invokeContract = issuerRecords => {
+      const issuers = issuerRecords.map(record => record.issuer);
+      instanceRecord.issuerKeywordRecord = arrayToObj(issuers, cleanedKeywords);
+      const brands = issuerRecords.map(record => record.brand);
+      instanceRecord.brandKeywordRecord = arrayToObj(brands, cleanedKeywords);
+
+      const contractFacet = makeContractFacet(zoeService);
+      const inviteP = E(contractCode).makeContract(contractFacet);
+      return { inviteP, zcfForZoe };
+    };
+
+    // The issuers may not have been seen before, so we must wait for
+    // the issuer records to be available synchronously
+    return issuerTable
+      .getPromiseForIssuerRecords(issuersP)
+      .then(invokeContract);
+  };
+
+  return harden({ startContract });
+}
+
+harden(buildRootObject);

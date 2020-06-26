@@ -1,16 +1,18 @@
 /* global harden */
 
 import '@agoric/install-ses';
+
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { test } from 'tape-promise/tape';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import bundleSource from '@agoric/bundle-source';
 
 import { assert, details } from '@agoric/assert';
-import { makeZoe } from '../../../src/zoe';
+import { makeZoe } from '../../..';
 import { setup } from '../setupBasicMints';
 import { setupNonFungible } from '../setupNonFungibleMints';
 import { makeGetInstanceHandle } from '../../../src/clientSupport';
+import fakeVatAdmin from './fakeVatAdmin';
 
 const simpleExchange = `${__dirname}/../../../src/contracts/simpleExchange`;
 
@@ -25,7 +27,7 @@ test('simpleExchange with valid offers', async t => {
     moola,
     simoleans,
   } = setup();
-  const zoe = makeZoe();
+  const zoe = makeZoe(fakeVatAdmin);
   const inviteIssuer = zoe.getInviteIssuer();
 
   // Pack the contract.
@@ -209,7 +211,7 @@ test('simpleExchange with multiple sell offers', async t => {
       moola,
       simoleans,
     } = setup();
-    const zoe = makeZoe();
+    const zoe = makeZoe(fakeVatAdmin);
     const inviteIssuer = zoe.getInviteIssuer();
 
     // Pack the contract.
@@ -301,7 +303,7 @@ test('simpleExchange with multiple sell offers', async t => {
 test('simpleExchange showPayoutRules', async t => {
   t.plan(1);
   const { moolaIssuer, simoleanIssuer, moolaMint, moola, simoleans } = setup();
-  const zoe = makeZoe();
+  const zoe = makeZoe(fakeVatAdmin);
 
   // Pack the contract.
   const bundle = await bundleSource(simpleExchange);
@@ -357,7 +359,7 @@ test('simpleExchange with non-fungible assets', async t => {
     createRpgItem,
   } = setupNonFungible();
 
-  const zoe = makeZoe();
+  const zoe = makeZoe(fakeVatAdmin);
   const inviteIssuer = zoe.getInviteIssuer();
 
   // Pack the contract.

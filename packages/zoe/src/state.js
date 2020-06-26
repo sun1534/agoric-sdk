@@ -12,20 +12,22 @@ import { makeTable, makeValidateProperties } from './table';
  */
 
 // Installation Table
-// Columns: handle | installation | bundle
+// Columns: bundle
 const makeInstallationTable = () => {
-  const validateSomewhat = makeValidateProperties(
-    harden(['installation', 'bundle']),
-  );
+  const validateSomewhat = makeValidateProperties(harden(['bundle']));
   return makeTable(validateSomewhat, 'installationHandle');
 };
 
 // Instance Table
-// Columns: handle | installationHandle | publicAPI | terms |
-// issuerKeywordRecord | brandKeywordRecord
+// Columns: installationHandle | publicAPI | terms | issuerKeywordRecord
+//  | brandKeywordRecord | zcfForZoe | offerHandles
+// Zoe uses this table to track contract instances. The issuerKeywordRecord and
+// brandKeyword are slightly redundant, but are each convenient at this point.
+// zcfForZoe provides a direct channel to the ZCF running in a vat. zcfForZoe
+// is initially set to a promise, since it can't be created until a reply is
+// received from the newly created vat. Zoe needs to know the offerHandles in
+// order to fulfill its responsibility for exit safety.
 const makeInstanceTable = () => {
-  // TODO: make sure this validate function protects against malicious
-  // misshapen objects rather than just a general check.
   const validateSomewhat = makeValidateProperties(
     harden([
       'installationHandle',
@@ -33,18 +35,40 @@ const makeInstanceTable = () => {
       'terms',
       'issuerKeywordRecord',
       'brandKeywordRecord',
+      'zcfForZoe',
+      'offerHandles',
     ]),
   );
 
-  return makeTable(validateSomewhat, 'instanceHandle');
+  const makeCustomMethods = table => {
+    const customMethods = harden({
+      addOffer: (instanceHandle, newOfferHandle) => {
+        const { offerHandles } = table.get(instanceHandle);
+        return table.update(instanceHandle, {
+          offerHandles: [...offerHandles, newOfferHandle],
+        });
+      },
+      removeCompletedOffers: (instanceHandle, handlesToDrop) => {
+        const { offerHandles } = table.get(instanceHandle);
+        const newHandles = offerHandles.filter(x => !handlesToDrop.includes(x));
+        return table.update(instanceHandle, { offerHandles: newHandles });
+      },
+    });
+    return customMethods;
+  };
+
+  return makeTable(validateSomewhat, 'instanceHandle', makeCustomMethods);
 };
 
 // Offer Table
-// Columns:
-//   handle | instanceHandle | proposal | currentAllocation, notifier, updater
+// Columns: instanceHandle | proposal | currentAllocation | notifier | updater
+// The two versions of this table are slightly different. Zoe's
+// currentAllocation is kept up-to-date with ZCF and will be used for closing.
+// Zcf effectively has a local cache of the allocations. Zoe's allocations are
+// definitive (in comparison to the ones in zcf), so Zoe's notifier is
+// authoritative. Zcf doesn't store a notifier, but does store a no-action
+// updater, so updateAmounts can work polymorphically.
 const makeOfferTable = () => {
-  // TODO: make sure this validate function protects against malicious
-  // misshapen objects rather than just a general check.
   const validateProperties = makeValidateProperties(
     harden([
       'instanceHandle',
@@ -120,11 +144,16 @@ const makePayoutMap = () => makeStore('offerHandle');
 // getPromiseForIssuerRecord is called and the record doesn't exist, it stores a
 // promise for the record in issuersInProgress, and then builds the record. It
 // updates the tables when done.
-const makeIssuerTable = () => {
+//
+// Zoe main has an issuerTable that stores the purses with deposited assets.
+// Zoe contract facet has everything but the purses.
+const makeIssuerTable = (withPurses = true) => {
   // TODO: make sure this validate function protects against malicious
   //  misshapen objects rather than just a general check.
   const validateSomewhat = makeValidateProperties(
-    harden(['brand', 'issuer', 'purse', 'amountMath']),
+    withPurses
+      ? harden(['brand', 'issuer', 'purse', 'amountMath'])
+      : harden(['brand', 'issuer', 'amountMath']),
   );
 
   const makeCustomMethods = table => {
@@ -139,26 +168,29 @@ const makeIssuerTable = () => {
       // remote calls which immediately return a promise
       const mathHelpersNameP = E(issuer).getMathHelpersName();
       const brandP = E(issuer).getBrand();
-      const purseP = E(issuer).makeEmptyPurse();
 
       // a promise for a synchronously accessible record
-      const synchronousRecordP = Promise.all([
-        brandP,
-        mathHelpersNameP,
-        purseP,
-      ]).then(([brand, mathHelpersName, purse]) => {
-        const amountMath = makeAmountMath(brand, mathHelpersName);
-        const issuerRecord = {
-          brand,
-          issuer,
-          purse,
-          amountMath,
-        };
-        table.create(issuerRecord, brand);
-        issuerToBrand.init(issuer, brand);
-        issuersInProgress.delete(issuer);
-        return table.get(brand);
-      });
+      const promiseRecord = [brandP, mathHelpersNameP];
+      if (withPurses) {
+        promiseRecord.push(E(issuer).makeEmptyPurse());
+      }
+      const synchronousRecordP = Promise.all(promiseRecord).then(
+        ([brand, mathHelpersName, purse]) => {
+          const amountMath = makeAmountMath(brand, mathHelpersName);
+          const issuerRecord = {
+            brand,
+            issuer,
+            amountMath,
+          };
+          if (withPurses) {
+            issuerRecord.purse = purse;
+          }
+          table.create(issuerRecord, brand);
+          issuerToBrand.init(issuer, brand);
+          issuersInProgress.delete(issuer);
+          return table.get(brand);
+        },
+      );
       issuersInProgress.init(issuer, synchronousRecordP);
       return synchronousRecordP;
     }
@@ -193,7 +225,7 @@ const makeIssuerTable = () => {
   return makeTable(validateSomewhat, 'brand', makeCustomMethods);
 };
 
-const makeTables = () =>
+const makeZoeTables = () =>
   harden({
     installationTable: makeInstallationTable(),
     instanceTable: makeInstanceTable(),
@@ -202,4 +234,10 @@ const makeTables = () =>
     issuerTable: makeIssuerTable(),
   });
 
-export { makeTables };
+const makeContractTables = () =>
+  harden({
+    offerTable: makeOfferTable(),
+    issuerTable: makeIssuerTable(false),
+  });
+
+export { makeZoeTables, makeContractTables };

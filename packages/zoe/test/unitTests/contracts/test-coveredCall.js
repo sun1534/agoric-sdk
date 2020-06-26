@@ -9,9 +9,10 @@ import bundleSource from '@agoric/bundle-source';
 import { sameStructure } from '@agoric/same-structure';
 
 import buildManualTimer from '../../../tools/manualTimer';
-import { makeZoe } from '../../../src/zoe';
+import { makeZoe } from '../../..';
 import { setup } from '../setupBasicMints';
 import { setupNonFungible } from '../setupNonFungibleMints';
+import fakeVatAdmin from './fakeVatAdmin';
 
 const coveredCallRoot = `${__dirname}/../../../src/contracts/coveredCall`;
 const atomicSwapRoot = `${__dirname}/../../../src/contracts/atomicSwap`;
@@ -20,7 +21,7 @@ test('zoe - coveredCall', async t => {
   t.plan(13);
   try {
     const { moolaR, simoleanR, moola, simoleans } = setup();
-    const zoe = makeZoe();
+    const zoe = makeZoe(fakeVatAdmin);
     // Pack the contract.
     const bundle = await bundleSource(coveredCallRoot);
     const coveredCallInstallationHandle = await zoe.install(bundle);
@@ -145,7 +146,7 @@ test(`zoe - coveredCall - alice's deadline expires, cancelling alice and bob`, a
   t.plan(13);
   try {
     const { moolaR, simoleanR, moola, simoleans } = setup();
-    const zoe = makeZoe();
+    const zoe = makeZoe(fakeVatAdmin);
     // Pack the contract.
     const bundle = await bundleSource(coveredCallRoot);
     const coveredCallInstallationHandle = await zoe.install(bundle);
@@ -280,7 +281,7 @@ test('zoe - coveredCall with swap for invite', async t => {
     // Setup the environment
     const timer = buildManualTimer(console.log);
     const { moolaR, simoleanR, bucksR, moola, simoleans, bucks } = setup();
-    const zoe = makeZoe();
+    const zoe = makeZoe(fakeVatAdmin);
     // Pack the contract.
     const coveredCallBundle = await bundleSource(coveredCallRoot);
 
@@ -543,7 +544,7 @@ test('zoe - coveredCall with coveredCall for invite', async t => {
     // Setup the environment
     const timer = buildManualTimer(console.log);
     const { moolaR, simoleanR, bucksR, moola, simoleans, bucks } = setup();
-    const zoe = makeZoe();
+    const zoe = makeZoe(fakeVatAdmin);
     // Pack the contract.
     const bundle = await bundleSource(coveredCallRoot);
 
@@ -825,7 +826,7 @@ test('zoe - coveredCall non-fungible', async t => {
     createRpgItem,
   } = setupNonFungible();
 
-  const zoe = makeZoe();
+  const zoe = makeZoe(fakeVatAdmin);
   // install the contract.
   const bundle = await bundleSource(coveredCallRoot);
   const coveredCallInstallationHandle = await zoe.install(bundle);
