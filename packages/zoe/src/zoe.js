@@ -510,7 +510,24 @@ function makeZoe(vatAdminSvc, _additionalEndowments = {}, _vatPowers = {}) {
             instanceTable.create(instanceRecord, instanceHandle);
           };
 
-          function finishContractInstall({ inviteP, zcfForZoe }) {
+          const callStartContract = () => {
+            const instanceData = harden({
+              installationHandle,
+              instanceHandle,
+              terms,
+              adminNode,
+            });
+            return E(zcfRoot).startContract(
+              zoeService,
+              issuerKeywordRecord,
+              installationTable.get(installationHandle).bundle,
+              instanceData,
+              zoeForZcf,
+              inviteIssuer,
+            );
+          };
+
+          const finishContractInstall = ({ inviteP, zcfForZoe }) => {
             zcfForZoePromise.resolve(zcfForZoe);
             instanceTable.update(instanceHandle, { zcfForZoe });
             return inviteIssuer.isLive(inviteP).then(success => {
@@ -527,26 +544,14 @@ function makeZoe(vatAdminSvc, _additionalEndowments = {}, _vatPowers = {}) {
                 };
               });
             });
-          }
+          };
 
           // The issuers may not have been seen before, so we must wait for the
           // issuer records to be available synchronously
           return issuerTable
             .getPromiseForIssuerRecords(issuersP)
             .then(addIssuersToInstanceRecord)
-            .then(() =>
-              E(zcfRoot).startContract(
-                zoeService,
-                zoeForZcf,
-                installationHandle,
-                issuerKeywordRecord,
-                terms,
-                instanceHandle,
-                installationTable.get(installationHandle).bundle,
-                adminNode,
-                inviteIssuer,
-              ),
-            )
+            .then(callStartContract)
             .then(finishContractInstall);
         });
     },

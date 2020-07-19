@@ -159,7 +159,17 @@ export function buildRootObject(_vatPowers) {
   // contains instanceHandle, installationHandle, terms, issuerKeywordRecord,
   // adminNode, and brandKeywordRecord. It could be converted to individual
   // fields.
-  const instanceRecord = {};
+  let instanceRecord;
+  const visibleInstanceRecordFields = [
+    'instanceHandle',
+    'installationHandle',
+    'terms',
+    'issuerKeywordRecord',
+    'brandKeywordRecord',
+  ];
+  const visibleInstanceRecord = () =>
+    filterObj(instanceRecord, visibleInstanceRecordFields);
+
   let activeOfferHandles = [];
 
   const { offerTable, issuerTable } = makeContractTables();
@@ -342,7 +352,7 @@ export function buildRootObject(_vatPowers) {
         assertOffersAreActive(offerHandles);
         return doGetCurrentAllocations(offerHandles, brandKeywordRecords);
       },
-      getInstanceRecord: () => instanceRecord,
+      getInstanceRecord: () => visibleInstanceRecord(),
       getBrandForIssuer: issuer => issuerTable.brandFromIssuer(issuer),
       getAmountMath: getAmountMathForBrand,
       getVatAdmin: instanceRecord.adminNode,
@@ -418,44 +428,31 @@ export function buildRootObject(_vatPowers) {
    * unique handle for the instance that can be shared, as well as
    * other information, such as the terms used in the instance.
    * @param zoeService - The canonical Zoe service in case the contract wants it
-   * @param zoeInner - An inner facet of Zoe for the contractFacet's use
-   * @param  {object} installationHandle - the unique handle for the
-   * installation
+   * @param innerZoe - An inner facet of Zoe for the contractFacet's use
    * @param {Object.<string,Issuer>} issuerKeywordRecord - a record mapping
    * keyword keys to issuer values
-   * @param  {object} terms - optional, arguments to the contract. These
-   * arguments depend on the contract.
-   * @param instanceHandle, the Zoe handle for this instance
    * @param bundle, an object containing source code and moduleFormat
-   * @param adminNode, the adminNode for the vat, which has done(), terminate()
-   *    and adminData()
    * @param inviteIssuerIn, Zoe's inviteIssuer, for the contract to use
+   * @param instanceData, fields for the instanceRecord
    * @returns { Promise<Invite>, ZcfForZoe }
    */
   const startContract = (
     zoeService,
-    zoeInner,
-    installationHandle,
     issuerKeywordRecord = harden({}),
-    terms = harden({}),
-    instanceHandle,
     bundle,
-    adminNode,
+    instanceData,
+    innerZoe,
     inviteIssuerIn,
   ) => {
-    zoeForZcf = zoeInner;
-    // make a contract facet
-    const contractCode = evalContractBundle(bundle);
+    zoeForZcf = innerZoe;
     inviteIssuer = inviteIssuerIn;
+    instanceRecord = { ...instanceData };
+    const contractCode = evalContractBundle(bundle);
 
     const cleanedKeywords = cleanKeywords(issuerKeywordRecord);
     const issuersP = cleanedKeywords.map(
       keyword => issuerKeywordRecord[keyword],
     );
-    instanceRecord.instanceHandle = instanceHandle;
-    instanceRecord.installationHandle = installationHandle;
-    instanceRecord.terms = terms;
-    instanceRecord.adminNode = adminNode;
 
     // invoke contract and return inner facet to Zoe.
     const invokeContract = issuerRecords => {
