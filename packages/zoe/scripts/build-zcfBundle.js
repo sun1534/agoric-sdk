@@ -4,7 +4,7 @@ import bundleSource from '@agoric/bundle-source';
 
 async function writeSourceBundle(contractFilename, outputPath) {
   await bundleSource(contractFilename).then(bundle => {
-    fs.mkdir(`${__dirname}/../bundles`, { recursive: true }, err => {
+    fs.mkdirSync(`${__dirname}/../bundles`, { recursive: true }, err => {
       if (err) throw err;
     });
     fs.writeFileSync(outputPath, `export default ${JSON.stringify(bundle)};`);
