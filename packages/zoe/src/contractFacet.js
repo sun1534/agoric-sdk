@@ -170,8 +170,6 @@ export function buildRootObject(_vatPowers) {
   const visibleInstanceRecord = () =>
     filterObj(instanceRecord, visibleInstanceRecordFields);
 
-  let activeOfferHandles = [];
-
   const { offerTable, issuerTable } = makeContractTables();
 
   let inviteIssuer;
@@ -180,10 +178,7 @@ export function buildRootObject(_vatPowers) {
 
   const assertOffersAreActive = candidateOfferHandles =>
     candidateOfferHandles.forEach(offerHandle =>
-      assert(
-        activeOfferHandles.includes(offerHandle),
-        details`Offer is not active`,
-      ),
+      assert(offerTable.has(offerHandle), details`Offer is not active`),
     );
 
   const removeAmountsAndNotifier = offerRecord =>
@@ -295,9 +290,6 @@ export function buildRootObject(_vatPowers) {
   function completeOffers(offerHandlesToDrop) {
     assertOffersAreActive(offerHandlesToDrop);
     offerTable.deleteOffers(offerHandlesToDrop);
-    activeOfferHandles = activeOfferHandles.filter(
-      x => !offerHandlesToDrop.includes(x),
-    );
     return E(zoeForZcf).completeOffers(offerHandlesToDrop);
   }
 
@@ -418,7 +410,6 @@ export function buildRootObject(_vatPowers) {
         );
       }
       offerTable.create(offerRecord, offerHandle);
-      activeOfferHandles.push(offerHandle);
       return completeObj;
     },
   });

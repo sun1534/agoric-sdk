@@ -28,6 +28,8 @@ const makeInstallationTable = () => {
 // received from the newly created vat. Zoe needs to know the offerHandles in
 // order to fulfill its responsibility for exit safety.
 const makeInstanceTable = () => {
+  // TODO: make sure this validate function protects against malicious
+  //  misshapen objects rather than just a general check.
   const validateSomewhat = makeValidateProperties(
     harden([
       'installationHandle',
@@ -45,13 +47,15 @@ const makeInstanceTable = () => {
       addOffer: (instanceHandle, newOfferHandle) => {
         const { offerHandles } = table.get(instanceHandle);
         return table.update(instanceHandle, {
-          offerHandles: [...offerHandles, newOfferHandle],
+          offerHandles: offerHandles.add(newOfferHandle),
         });
       },
       removeCompletedOffers: (instanceHandle, handlesToDrop) => {
         const { offerHandles } = table.get(instanceHandle);
-        const newHandles = offerHandles.filter(x => !handlesToDrop.includes(x));
-        return table.update(instanceHandle, { offerHandles: newHandles });
+        for (const h of handlesToDrop) {
+          offerHandles.delete(h);
+        }
+        return table.update(instanceHandle, { offerHandles });
       },
     });
     return customMethods;
@@ -69,6 +73,8 @@ const makeInstanceTable = () => {
 // authoritative. Zcf doesn't store a notifier, but does store a no-action
 // updater, so updateAmounts can work polymorphically.
 const makeOfferTable = () => {
+  // TODO: make sure this validate function protects against malicious
+  //  misshapen objects rather than just a general check.
   const validateProperties = makeValidateProperties(
     harden([
       'instanceHandle',

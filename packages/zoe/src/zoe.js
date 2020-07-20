@@ -392,19 +392,20 @@ function makeZoe(vatAdminSvc, _additionalEndowments = {}, _vatPowers = {}) {
       },
       addNewIssuer: (issuerP, keyword) =>
         issuerTable.getPromiseForIssuerRecord(issuerP).then(issuerRecord => {
-          // assertions were already checked in ZCF, but we'll check again
-          assertKeywordName(keyword);
-          const { issuerKeywordRecord } = instanceTable.get(instanceHandle);
-          assert(
-            !getKeywords(issuerKeywordRecord).includes(keyword),
-            details`keyword ${keyword} must be unique`,
+          const { issuerKeywordRecord, brandKeywordRecord } = instanceTable.get(
+            instanceHandle,
           );
           const newIssuerKeywordRecord = {
             ...issuerKeywordRecord,
             [keyword]: issuerRecord.issuer,
           };
+          const newBrandKeywordRecord = {
+            ...brandKeywordRecord,
+            [keyword]: issuerRecord.brand,
+          };
           instanceTable.update(instanceHandle, {
             issuerKeywordRecord: newIssuerKeywordRecord,
+            brandKeywordRecord: newBrandKeywordRecord,
           });
         }),
       completeOffers: offerHandles =>
@@ -495,7 +496,7 @@ function makeZoe(vatAdminSvc, _additionalEndowments = {}, _vatPowers = {}) {
             publicAPI: publicApiP.promise,
             terms,
             zcfForZoe: zcfForZoePromise.promise,
-            offerHandles: harden([]),
+            offerHandles: new Set(),
           };
           const addIssuersToInstanceRecord = issuerRecords => {
             const issuers = issuerRecords.map(record => record.issuer);
