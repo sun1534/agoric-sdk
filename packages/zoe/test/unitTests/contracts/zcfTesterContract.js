@@ -15,8 +15,8 @@ const makeContract = zcf => {
   Object.keys(brandKeywordRecord).forEach(keyword => {
     // TODO: import tap/tape and do t.equals
     assert.equal(
-      zcf.getIssuerForBrand(brandKeywordRecord[keyword]),
-      issuerKeywordRecord[keyword],
+      brandKeywordRecord[keyword],
+      issuerKeywordRecord[keyword].getBrand(),
     );
   });
   return zcf.makeInvitation(() => {}, 'test');

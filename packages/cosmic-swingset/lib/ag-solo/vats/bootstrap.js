@@ -410,7 +410,11 @@ export function buildRootObject(vatPowers) {
           // localhost, HTML frontend on localhost. Single-player mode.
 
           // bootAddress holds the pubkey of localclient
-          const chainBundler = await makeChainBundler(vats, devices.timer, vatAdminSvc);
+          const chainBundler = await makeChainBundler(
+            vats,
+            devices.timer,
+            vatAdminSvc,
+          );
 
           // Allow manual provisioning requests via `agoric cosmos`.
           await E(vats.provisioning).register(
@@ -470,7 +474,11 @@ export function buildRootObject(vatPowers) {
           // frontend. Limited subset of demo runs inside the solo node.
 
           // We pretend we're on-chain.
-          const chainBundler = makeChainBundler(vats, devices.timer, vatAdminSvc);
+          const chainBundler = makeChainBundler(
+            vats,
+            devices.timer,
+            vatAdminSvc,
+          );
           await registerNetworkProtocols(vats, bridgeManager);
 
           // Shared Setup (virtual chain side) ///////////////////////////

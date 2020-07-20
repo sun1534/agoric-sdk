@@ -8,12 +8,7 @@ import { assert, details } from '@agoric/assert';
 import { produceNotifier } from '@agoric/notifier';
 import { producePromise } from '@agoric/produce-promise';
 
-import {
-  cleanProposal,
-  cleanKeywords,
-  getKeywords,
-  assertKeywordName,
-} from './cleanProposal';
+import { cleanProposal, cleanKeywords } from './cleanProposal';
 import { arrayToObj, filterFillAmounts, filterObj } from './objArrayConversion';
 import { makeZoeTables } from './state';
 
@@ -26,7 +21,6 @@ import zcfContractBundle from '../bundles/bundle-contractFacet';
 
 /**
  * Zoe uses ERTP, the Electronic Rights Transfer Protocol
-<<<<<<< HEAD
  */
 
 /**
@@ -36,14 +30,6 @@ import zcfContractBundle from '../bundles/bundle-contractFacet';
  * @typedef {import('@agoric/ertp').Payment} Payment
  * @typedef {import('@agoric/ertp').Issuer} Issuer
  * @typedef {import('@agoric/ertp').Purse} Purse
-=======
- * @typedef {import('@agoric/ertp/src/issuer').Amount} Amount
- * @typedef {import('@agoric/ertp/src/issuer').Brand} Brand
- * @typedef {import('@agoric/ertp/src/amountMath').AmountMath} AmountMath
- * @typedef {import('@agoric/ertp/src/issuer').Payment} Payment
- * @typedef {import('@agoric/ertp/src/issuer').Issuer} Issuer
- * @typedef {import('@agoric/ertp/src/issuer').Purse} Purse
->>>>>>> refactor: move code around w/out change to act as base for comparing
  *
  * @typedef {any} TODO Needs to be typed
  * @typedef {string} Keyword
