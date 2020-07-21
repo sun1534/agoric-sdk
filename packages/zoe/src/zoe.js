@@ -320,7 +320,7 @@ function makeZoe(vatAdminSvc, _additionalEndowments = {}, _vatPowers = {}) {
     );
   };
 
-  // Make a Zoe invite payment with an extent that is a mix of credible
+  // Make a Zoe invite payment with an value that is a mix of credible
   // information from Zoe (the `handle` and `instanceHandle`) and
   // other information defined by the smart contract (the mandatory
   // `inviteDesc` and the optional `options.customProperties`).
@@ -578,7 +578,7 @@ function makeZoe(vatAdminSvc, _additionalEndowments = {}, _vatPowers = {}) {
     ) => {
       return inviteIssuer.burn(invite).then(inviteAmount => {
         assert(
-          inviteAmount.extent.length === 1,
+          inviteAmount.value.length === 1,
           'only one invite should be redeemed',
         );
         const giveKeywords = proposal.give
@@ -608,7 +608,7 @@ function makeZoe(vatAdminSvc, _additionalEndowments = {}, _vatPowers = {}) {
         });
 
         const {
-          extent: [{ instanceHandle, handle: inviteHandle }],
+          value: [{ instanceHandle, handle: inviteHandle }],
         } = inviteAmount;
         const offerHandle = harden({});
 

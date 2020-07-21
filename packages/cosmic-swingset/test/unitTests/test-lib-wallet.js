@@ -28,7 +28,7 @@ const setupTest = async () => {
   const moolaBundle = makeIssuerKit('moola');
   const simoleanBundle = makeIssuerKit('simolean');
   const rpgBundle = makeIssuerKit('rpg', 'strSet');
-  const zoe = makeZoe();
+  const zoe = makeZoe(fakeVatAdmin);
   const registry = makeRegistrar();
   const board = makeBoard();
 
