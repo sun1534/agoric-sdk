@@ -11,14 +11,14 @@ import { makeTable, makeValidateProperties } from './table';
  * @typedef {import('@agoric/ertp').Payment} Payment
  */
 
-// Installation Table
+// Installation Table key: installationHandle
 // Columns: bundle
 const makeInstallationTable = () => {
   const validateSomewhat = makeValidateProperties(harden(['bundle']));
   return makeTable(validateSomewhat, 'installationHandle');
 };
 
-// Instance Table
+// Instance Table key: instanceHandle
 // Columns: installationHandle | publicAPI | terms | issuerKeywordRecord
 //  | brandKeywordRecord | zcfForZoe | offerHandles
 // Zoe uses this table to track contract instances. The issuerKeywordRecord and
@@ -64,7 +64,7 @@ const makeInstanceTable = () => {
   return makeTable(validateSomewhat, 'instanceHandle', makeCustomMethods);
 };
 
-// Offer Table
+// Offer Table key: offerHandle
 // Columns: instanceHandle | proposal | currentAllocation | notifier | updater
 // The two versions of this table are slightly different. Zoe's
 // currentAllocation is kept up-to-date with ZCF and will be used for closing.
@@ -134,7 +134,8 @@ const makeOfferTable = () => {
   return makeTable(validateSomewhat, 'offerHandle', makeCustomMethods);
 };
 
-// Payout Map
+// Payout Map key: offerHandle
+// Columns: payout
 /**
  * Create payoutMap
  * @returns {import('@agoric/store').Store<OfferHandle,
@@ -142,8 +143,8 @@ const makeOfferTable = () => {
  */
 const makePayoutMap = () => makeStore('offerHandle');
 
-// Issuer Table
-// Columns: brand | issuer | purse | amountMath
+// Issuer Table key: brand
+// Columns: issuer | purse | amountMath
 //
 // The IssuerTable is keyed by brand, but the Issuer is required in order for
 // getPromiseForIssuerRecord() to initialize the records. When
