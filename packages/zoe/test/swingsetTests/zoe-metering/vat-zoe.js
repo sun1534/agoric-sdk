@@ -1,5 +1,3 @@
-/* global harden */
-
 import { makeZoe } from '../../..';
 
 export function buildRootObject(_vatPowers) {
