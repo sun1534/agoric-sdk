@@ -69,7 +69,7 @@ function makeZoe(vatAdminSvc, _additionalEndowments = {}, _vatPowers = {}) {
 
   /**
    * @param {InstanceHandle} instanceHandle
-   * @param {OfferHandle[]} offerHandles
+   * @param {Iterable<OfferHandle>} offerHandles
    */
   const completeOffers = (instanceHandle, offerHandles) => {
     const { inactive } = offerTable.getOfferStatuses(offerHandles);
@@ -293,10 +293,13 @@ function makeZoe(vatAdminSvc, _additionalEndowments = {}, _vatPowers = {}) {
           // We'll store an initial version of InstanceRecord before invoking
           // ZCF and fill in the zcfForZoe when we get it.
           const zcfForZoePromise = producePromise();
+          /** @type {InstanceRecord} */
           const instanceRecord = {
             installationHandle,
             publicAPI: publicApiP.promise,
             terms,
+            issuerKeywordRecord: {},
+            brandKeywordRecord: {},
             zcfForZoe: zcfForZoePromise.promise,
             offerHandles: new Set(),
           };
@@ -462,7 +465,7 @@ function makeZoe(vatAdminSvc, _additionalEndowments = {}, _vatPowers = {}) {
 
         const makeOfferResult = completeObj => {
           const seatCallback = inviteHandleToCallback.get(inviteHandle);
-          const outcomeP = E(seatCallback).invoke(offerHandle);
+          const outcomeP = E(seatCallback)(offerHandle);
           const offerResult = {
             offerHandle: HandledPromise.resolve(offerHandle),
             payout: payoutMap.get(offerHandle).promise,

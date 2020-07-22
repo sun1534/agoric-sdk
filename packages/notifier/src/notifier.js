@@ -11,7 +11,7 @@ import { producePromise } from '@agoric/produce-promise';
 /**
  * @template T the type of the state value
  * @typedef {Object} UpdateRecord<T>
- * @property {T} value is whatever state the service wants to publish
+ * @property {T | undefined} value is whatever state the service wants to publish
  * @property {UpdateHandle} updateHandle is a value that identifies the update
  * @property {boolean} done false until the updater publishes a final state
  */
@@ -92,7 +92,7 @@ export const produceNotifier = (initialState = undefined) => {
 
     currentResponse = harden({
       value: finalState,
-      updateHandle: undefined,
+      updateHandle: {},
       done: true,
     });
     currentPromiseRec.resolve(currentResponse);
