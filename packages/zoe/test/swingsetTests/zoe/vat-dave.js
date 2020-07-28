@@ -16,14 +16,14 @@ const build = async (log, zoe, issuers, payments, installations, timer) => {
   const [moolaPurseP, simoleanPurseP, bucksPurseP] = purses;
   const [_moolaPayment, simoleanPayment, bucksPayment] = payments;
   const [moolaIssuer, simoleanIssuer, bucksIssuer] = issuers;
-  const inviteIssuer = await E(zoe).getInviteIssuer();
-  const getInstanceHandle = makeGetInstanceHandle(inviteIssuer);
+  const invitationIssuer = await E(zoe).getInvitationIssuer();
+  const getInstanceHandle = makeGetInstanceHandle(invitationIssuer);
 
   return harden({
     doPublicAuction: async inviteP => {
       const invite = await inviteP;
-      const exclInvite = await E(inviteIssuer).claim(invite);
-      const { value: inviteValue } = await E(inviteIssuer).getAmountOf(
+      const exclInvite = await E(invitationIssuer).claim(invite);
+      const { value: inviteValue } = await E(invitationIssuer).getAmountOf(
         exclInvite,
       );
 
@@ -74,8 +74,8 @@ const build = async (log, zoe, issuers, payments, installations, timer) => {
       // Dave is looking to buy the option to trade his 7 simoleans for
       // 3 moola, and is willing to pay 1 buck for the option.
       const invite = await inviteP;
-      const exclInvite = await E(inviteIssuer).claim(invite);
-      const { value: inviteValue } = await E(inviteIssuer).getAmountOf(
+      const exclInvite = await E(invitationIssuer).claim(invite);
+      const { value: inviteValue } = await E(invitationIssuer).getAmountOf(
         exclInvite,
       );
       const instanceHandle = await getInstanceHandle(exclInvite);
@@ -104,7 +104,7 @@ const build = async (log, zoe, issuers, payments, installations, timer) => {
       );
       assert(
         sameStructure(
-          harden({ Asset: inviteIssuer, Price: bucksIssuer }),
+          harden({ Asset: invitationIssuer, Price: bucksIssuer }),
           issuerKeywordRecord,
         ),
         details`issuerKeywordRecord were not as expected`,

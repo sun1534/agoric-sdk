@@ -1,5 +1,5 @@
 import { E } from '@agoric/eventual-send';
-import { evalContractBundle } from '../../../src/evalContractCode';
+import { evalContractBundle } from '../../../src/zoeContractFacet/evalContractCode';
 
 export default harden({
   createVat: bundle => {

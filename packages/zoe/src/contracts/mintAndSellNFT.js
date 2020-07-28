@@ -24,8 +24,7 @@ import { E } from '@agoric/eventual-send';
  * @typedef {import('../zoe').ContractFacet} ContractFacet
  * @param {ContractFacet} zcf
  */
-const makeContract = zcf => {
-  const { terms } = zcf.getInstanceRecord();
+const execute = (zcf, terms) => {
   const { tokenName = 'token' } = terms;
 
   // Create the internal token mint
@@ -40,7 +39,7 @@ const makeContract = zcf => {
     customValueProperties,
     count,
     moneyIssuer,
-    sellItemsInstallationHandle,
+    sellItemsInstallation,
     pricePerItem,
   }) => {
     const tokenAmount = tokenAmountMath.make(
@@ -80,36 +79,30 @@ const makeContract = zcf => {
       pricePerItem,
     });
     return E(zoeService)
-      .makeInstance(
-        sellItemsInstallationHandle,
-        issuerKeywordRecord,
-        sellItemsTerms,
-      )
-      .then(({ invite, instanceRecord: { handle: instanceHandle } }) => {
+      .makeInstance(sellItemsInstallation, issuerKeywordRecord, sellItemsTerms)
+      .then(sellItemsAdmin => {
         return E(zoeService)
-          .offer(invite, proposal, paymentKeywordRecord)
+          .offer(
+            E(sellItemsAdmin).getInitialInvite(),
+            proposal,
+            paymentKeywordRecord,
+          )
           .then(offerResult => {
             return harden({
               ...offerResult,
-              sellItemsInstanceHandle: instanceHandle,
+              sellItemsInstanceDescription: sellItemsAdmin.getDescription(),
             });
           });
       });
   };
 
-  const mintTokensHook = _offerHandle => {
-    // outcome is an object with a sellTokens method
-    return harden({ sellTokens });
-  };
+  const admin = harden({
+    sellTokens,
+    getTokenIssuer: () => issuer,
+  });
 
-  zcf.initPublicAPI(
-    harden({
-      getTokenIssuer: () => issuer,
-    }),
-  );
-
-  return zcf.makeInvitation(mintTokensHook, 'mint tokens');
+  return admin;
 };
 
-harden(makeContract);
-export { makeContract };
+harden(execute);
+export { execute };

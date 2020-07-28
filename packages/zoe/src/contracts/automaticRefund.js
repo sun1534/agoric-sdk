@@ -15,26 +15,22 @@
  * @typedef {import('../zoe').ContractFacet} ContractFacet
  * @param {ContractFacet} zcf
  */
-const makeContract = zcf => {
+const execute = (zcf, _terms) => {
   let offersCount = 0;
 
-  const refundOfferHook = offerHandle => {
+  const refund = seat => {
     offersCount += 1;
-    zcf.complete(harden([offerHandle]));
+    seat.exit();
     return `The offer was accepted`;
   };
-  const makeRefundInvite = () =>
-    zcf.makeInvitation(refundOfferHook, 'getRefund');
 
-  zcf.initPublicAPI(
-    harden({
-      getOffersCount: () => offersCount,
-      makeInvite: makeRefundInvite,
-    }),
-  );
+  const admin = harden({
+    makeRefundInvite: () => zcf.makeInvitation(refund, 'getRefund'),
+    getOffersCount: () => offersCount,
+  });
 
-  return makeRefundInvite();
+  return admin;
 };
 
-harden(makeContract);
-export { makeContract };
+harden(execute);
+export { execute };

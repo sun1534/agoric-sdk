@@ -16,7 +16,7 @@ test('zoe - secondPriceAuction w/ 3 bids', async t => {
   try {
     const { moolaR, simoleanR, moola, simoleans } = setup();
     const zoe = makeZoe(fakeVatAdmin);
-    const inviteIssuer = zoe.getInviteIssuer();
+    const invitationIssuer = zoe.getInvitationIssuer();
 
     // Setup Alice
     const aliceMoolaPayment = moolaR.mint.mintPayment(moola(1));
@@ -78,10 +78,10 @@ test('zoe - secondPriceAuction w/ 3 bids', async t => {
 
     // Alice spreads the invites far and wide and Bob decides he
     // wants to participate in the auction.
-    const bobExclusiveInvite = await inviteIssuer.claim(bobInvite);
+    const bobExclusiveInvite = await invitationIssuer.claim(bobInvite);
     const {
       value: [bobInviteValue],
-    } = await inviteIssuer.getAmountOf(bobExclusiveInvite);
+    } = await invitationIssuer.getAmountOf(bobExclusiveInvite);
 
     const {
       installationHandle: bobInstallationId,
@@ -121,10 +121,10 @@ test('zoe - secondPriceAuction w/ 3 bids', async t => {
 
     // Carol decides to bid for the one moola
 
-    const carolExclusiveInvite = await inviteIssuer.claim(carolInvite);
+    const carolExclusiveInvite = await invitationIssuer.claim(carolInvite);
     const {
       value: [carolInviteValue],
-    } = await inviteIssuer.getAmountOf(carolExclusiveInvite);
+    } = await invitationIssuer.getAmountOf(carolExclusiveInvite);
 
     const {
       installationHandle: carolInstallationId,
@@ -167,10 +167,10 @@ test('zoe - secondPriceAuction w/ 3 bids', async t => {
     );
 
     // Dave decides to bid for the one moola
-    const daveExclusiveInvite = await inviteIssuer.claim(daveInvite);
+    const daveExclusiveInvite = await invitationIssuer.claim(daveInvite);
     const {
       value: [daveInviteValue],
-    } = await inviteIssuer.getAmountOf(daveExclusiveInvite);
+    } = await invitationIssuer.getAmountOf(daveExclusiveInvite);
 
     const {
       installationHandle: daveInstallationId,
@@ -455,7 +455,7 @@ test('zoe - secondPriceAuction non-fungible asset', async t => {
     moola,
   } = setupMixed();
   const zoe = makeZoe(fakeVatAdmin);
-  const inviteIssuer = zoe.getInviteIssuer();
+  const invitationIssuer = zoe.getInvitationIssuer();
 
   // Setup Alice
   const aliceCcPayment = ccMint.mintPayment(cryptoCats(harden(['Felix'])));
@@ -517,10 +517,10 @@ test('zoe - secondPriceAuction non-fungible asset', async t => {
 
   // Alice spreads the invites far and wide and Bob decides he
   // wants to participate in the auction.
-  const bobExclusiveInvite = await inviteIssuer.claim(bobInvite);
+  const bobExclusiveInvite = await invitationIssuer.claim(bobInvite);
   const {
     value: [bobInviteValue],
-  } = await inviteIssuer.getAmountOf(bobExclusiveInvite);
+  } = await invitationIssuer.getAmountOf(bobExclusiveInvite);
 
   const {
     installationHandle: bobInstallationId,
@@ -560,10 +560,10 @@ test('zoe - secondPriceAuction non-fungible asset', async t => {
 
   // Carol decides to bid for the one cc
 
-  const carolExclusiveInvite = await inviteIssuer.claim(carolInvite);
+  const carolExclusiveInvite = await invitationIssuer.claim(carolInvite);
   const {
     value: [carolInviteValue],
-  } = await inviteIssuer.getAmountOf(carolExclusiveInvite);
+  } = await invitationIssuer.getAmountOf(carolExclusiveInvite);
 
   const {
     installationHandle: carolInstallationId,
@@ -606,10 +606,10 @@ test('zoe - secondPriceAuction non-fungible asset', async t => {
   );
 
   // Dave decides to bid for the one moola
-  const daveExclusiveInvite = await inviteIssuer.claim(daveInvite);
+  const daveExclusiveInvite = await invitationIssuer.claim(daveInvite);
   const {
     value: [daveInviteValue],
-  } = await inviteIssuer.getAmountOf(daveExclusiveInvite);
+  } = await invitationIssuer.getAmountOf(daveExclusiveInvite);
 
   const {
     installationHandle: daveInstallationId,

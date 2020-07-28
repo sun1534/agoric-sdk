@@ -13,12 +13,14 @@ const build = async (zoe, issuers, payments, installations) => {
   const [moolaPurseP, simoleanPurseP] = purses;
   const [_moolaPayment, simoleanPayment] = payments;
   const [moolaIssuer, simoleanIssuer] = issuers;
-  const inviteIssuer = await E(zoe).getInviteIssuer();
+  const invitationIssuer = await E(zoe).getInvitationIssuer();
 
   return harden({
     doPublicAuction: async inviteP => {
-      const invite = await E(inviteIssuer).claim(inviteP);
-      const { value: inviteValue } = await E(inviteIssuer).getAmountOf(invite);
+      const invite = await E(invitationIssuer).claim(inviteP);
+      const { value: inviteValue } = await E(invitationIssuer).getAmountOf(
+        invite,
+      );
 
       const { installationHandle, terms, issuerKeywordRecord } = await E(
         zoe,

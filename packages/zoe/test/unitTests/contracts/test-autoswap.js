@@ -3,97 +3,225 @@ import '@agoric/install-ses';
 import { test } from 'tape-promise/tape';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import bundleSource from '@agoric/bundle-source';
+import { E } from '@agoric/eventual-send';
 
-import { makeZoe } from '../../..';
+import { makeZoe } from '../../../src/zoeService/zoe';
 import { setup } from '../setupBasicMints';
-import { makeGetInstanceHandle } from '../../../src/clientSupport';
 import fakeVatAdmin from './fakeVatAdmin';
 
-const autoswapRoot = `${__dirname}/../../../src/contracts/autoswap`;
+const contractRoot = `${__dirname}/../../../src/contracts/autoswap`;
 
 test('autoSwap with valid offers', async t => {
   t.plan(19);
   try {
-    const {
-      moolaIssuer,
-      simoleanIssuer,
-      moolaMint,
-      simoleanMint,
-      moola,
-      simoleans,
-    } = setup();
-    const zoe = makeZoe(fakeVatAdmin);
-    const inviteIssuer = zoe.getInviteIssuer();
-    const getInstanceHandle = makeGetInstanceHandle(inviteIssuer);
+    const { moolaKit, simoleanKit, moola, simoleans, zoe } = setup();
 
-    // Setup Alice
-    const aliceMoolaPayment = moolaMint.mintPayment(moola(10));
-    // Let's assume that simoleans are worth 2x as much as moola
-    const aliceSimoleanPayment = simoleanMint.mintPayment(simoleans(5));
+    const makeAlice = async (moolaPayment, simoleanPayment) => {
+      const moolaPurse = await E(moolaKit.issuer).makeEmptyPurse();
+      const simoleanPurse = await E(simoleanKit.issuer).makeEmptyPurse();
+      return {
+        installCode: async () => {
+          // pack the contract
+          const bundle = await bundleSource(contractRoot);
+          // install the contract
+          const installationP = E(zoe).install(bundle);
+          return installationP;
+        },
+        makeInstance: async installation => {
+          const issuerKeywordRecord = harden({
+            TokenA: moolaKit.issuer,
+            TokenB: simoleanKit.issuer,
+          });
+          const adminP = zoe.makeInstance(installation, issuerKeywordRecord);
+          return adminP;
+        },
+        offer: async admin => {
+          const liquidityIssuer = await E(admin).getLiquidityIssuer();
+          const liquidityAmountMath = await getLocalAmountMath(liquidityIssuer);
+          const liquidity = liquidityAmountMath.make;
 
-    // Setup Bob
-    const bobMoolaPayment = moolaMint.mintPayment(moola(3));
-    const bobSimoleanPayment = simoleanMint.mintPayment(simoleans(3));
+          // Alice adds liquidity
+          // 10 moola = 5 simoleans at the time of the liquidity adding
+          // aka 2 moola = 1 simolean
+          const aliceProposal = harden({
+            want: { Liquidity: liquidity(10) },
+            give: { TokenA: moola(10), TokenB: simoleans(5) },
+          });
+          const alicePayments = {
+            TokenA: moolaPayment,
+            TokenB: simoleanPayment,
+          };
 
-    // Alice creates an autoswap instance
+          const addLiquidityInvite = E(admin).makeAddLiquidityInvite();
+          const addLiquiditySeat = await zoe.offer(
+            addLiquidityInvite,
+            aliceProposal,
+            alicePayments,
+          );
 
-    // Pack the contract.
-    const bundle = await bundleSource(autoswapRoot);
+          t.equals(
+            await E(addLiquiditySeat).getOfferResult(),
+            'Added liquidity.',
+            `added liquidity message`,
+          );
 
-    const installationHandle = await zoe.install(bundle);
-    const issuerKeywordRecord = harden({
-      TokenA: moolaIssuer,
-      TokenB: simoleanIssuer,
-    });
-    const {
-      invite: aliceInvite,
-      instanceRecord: { publicAPI },
-    } = await zoe.makeInstance(installationHandle, issuerKeywordRecord);
-    const liquidityIssuer = publicAPI.getLiquidityIssuer();
-    const liquidity = liquidityIssuer.getAmountMath().make;
+          const liquidityPayments = await aliceAddLiquidityPayoutP;
+          const liquidityPayout = await liquidityPayments.Liquidity;
 
-    // Alice adds liquidity
-    // 10 moola = 5 simoleans at the time of the liquidity adding
-    // aka 2 moola = 1 simolean
-    const aliceProposal = harden({
-      want: { Liquidity: liquidity(10) },
-      give: { TokenA: moola(10), TokenB: simoleans(5) },
-    });
-    const alicePayments = {
-      TokenA: aliceMoolaPayment,
-      TokenB: aliceSimoleanPayment,
+          t.deepEquals(
+            await liquidityIssuer.getAmountOf(liquidityPayout),
+            liquidity(10),
+            `liquidity payout`,
+          );
+          t.deepEquals(
+            publicAPI.getPoolAllocation(),
+            {
+              TokenA: moola(10),
+              TokenB: simoleans(5),
+              Liquidity: liquidity(0),
+            },
+            `pool allocation`,
+          );
+
+          // Alice creates an invite for autoswap and sends it to Bob
+          const bobInvite = admin.makeSwapInvite();
+
+          const firstInvitation = E(admin).getInvitation();
+
+          const proposal = harden({
+            give: { Asset: moola(3) },
+            want: { Price: simoleans(7) },
+            exit: { onDemand: null },
+          });
+          const payments = { Asset: moolaPayment };
+
+          const seat = await zoe.offer(firstInvitation, proposal, payments);
+
+          seat
+            .getPayout('Asset')
+            .then(moolaPurse.deposit)
+            .then(amountDeposited =>
+              t.deepEquals(
+                amountDeposited,
+                moola(0),
+                `Alice didn't get any of what she put in`,
+              ),
+            );
+
+          seat
+            .getPayout('Price')
+            .then(simoleanPurse.deposit)
+            .then(amountDeposited =>
+              t.deepEquals(
+                amountDeposited,
+                proposal.want.Price,
+                `Alice got exactly what she wanted`,
+              ),
+            );
+
+          // The result of making the first offer is an invite to swap by
+          // providing the other goods.
+          const invitationP = seat.getOfferResult();
+          return invitationP;
+        },
+      };
     };
 
-    const {
-      payout: aliceAddLiquidityPayoutP,
-      outcome: liquidityOkP,
-    } = await zoe.offer(aliceInvite, aliceProposal, alicePayments);
+    const makeBob = (installation, simoleanPayment) => {
+      return harden({
+        offer: async untrustedInvitation => {
+          const moolaPurse = moolaKit.issuer.makeEmptyPurse();
+          const simoleanPurse = simoleanKit.issuer.makeEmptyPurse();
 
-    t.equals(await liquidityOkP, 'Added liquidity.', `added liquidity message`);
+          const invitationIssuer = await E(zoe).getInvitationIssuer();
 
-    const liquidityPayments = await aliceAddLiquidityPayoutP;
-    const liquidityPayout = await liquidityPayments.Liquidity;
+          // Bob is able to use the trusted invitationIssuer from Zoe to
+          // transform an untrusted invitation that Alice also has access to, to
+          // an
+          const invitation = await invitationIssuer.claim(untrustedInvitation);
 
-    t.deepEquals(
-      await liquidityIssuer.getAmountOf(liquidityPayout),
-      liquidity(10),
-      `liquidity payout`,
+          const {
+            value: [invitationValue],
+          } = await invitationIssuer.getAmountOf(invitation);
+
+          t.equals(
+            invitationValue.installation,
+            installation,
+            'installation is atomicSwap',
+          );
+          t.deepEquals(
+            invitationValue.asset,
+            moola(3),
+            `asset to be traded is 3 moola`,
+          );
+          t.deepEquals(
+            invitationValue.price,
+            simoleans(7),
+            `price is 7 simoleans, so bob must give that`,
+          );
+
+          const proposal = harden({
+            give: { Price: simoleans(7) },
+            want: { Asset: moola(3) },
+            exit: { onDemand: null },
+          });
+          const payments = { Price: simoleanPayment };
+
+          const seat = await zoe.offer(invitation, proposal, payments);
+
+          t.equals(
+            await E(seat).getOfferResult(),
+            'The offer has been accepted. Once the contract has been completed, please check your payout',
+          );
+
+          seat
+            .getPayout('Asset')
+            .then(moolaPurse.deposit)
+            .then(amountDeposited =>
+              t.deepEquals(
+                amountDeposited,
+                proposal.want.Asset,
+                `Bob got what he wanted`,
+              ),
+            );
+
+          seat
+            .getPayout('Price')
+            .then(simoleanPurse.deposit)
+            .then(amountDeposited =>
+              t.deepEquals(
+                amountDeposited,
+                simoleans(0),
+                `Bob didn't get anything back`,
+              ),
+            );
+        },
+      });
+    };
+
+    // Let's assume that simoleans are worth 2x as much as moola
+    const alice = await makeAlice(
+      await E(moolaKit.mint).mintPayment(moola(10)),
+      await E(simoleanKit.mint).mintPayment(simoleans(5)),
     );
-    t.deepEquals(
-      publicAPI.getPoolAllocation(),
-      {
-        TokenA: moola(10),
-        TokenB: simoleans(5),
-        Liquidity: liquidity(0),
-      },
-      `pool allocation`,
+    const bob = await makeBob(
+      await E(moolaKit.mint.mintPayment(moola(3))),
+      await E(simoleanKit.mint).mintPayment(simoleans(3)),
     );
 
-    // Alice creates an invite for autoswap and sends it to Bob
-    const bobInvite = publicAPI.makeSwapInvite();
+    // Alice makes an instance and makes her offer.
+    const installation = await alice.installCode();
+    const admin = await alice.makeInstance(installation);
+    const invitation = await alice.offer(admin);
+
+    // Alice spreads the invitation far and wide with instructions
+    // on how to use it and Bob decides he wants to be the
+    // counter-party, without needing to trust Alice at all.
+
+    await bob.offer(invitation);
 
     // Bob claims it
-    const bobExclInvite = await inviteIssuer.claim(bobInvite);
+    const bobExclInvite = await invitationIssuer.claim(bobInvite);
     const bobInstanceHandle = await getInstanceHandle(bobExclInvite);
     const {
       publicAPI: bobAutoswap,
@@ -251,8 +379,8 @@ test('autoSwap - test fee', async t => {
       simoleans,
     } = setup();
     const zoe = makeZoe(fakeVatAdmin);
-    const inviteIssuer = zoe.getInviteIssuer();
-    const getInstanceHandle = makeGetInstanceHandle(inviteIssuer);
+    const invitationIssuer = zoe.getInvitationIssuer();
+    const getInstanceHandle = makeGetInstanceHandle(invitationIssuer);
 
     // Setup Alice
     const aliceMoolaPayment = moolaMint.mintPayment(moola(10000));
@@ -315,7 +443,7 @@ test('autoSwap - test fee', async t => {
     const bobInvite = publicAPI.makeSwapInvite();
 
     // Bob claims it
-    const bobExclInvite = await inviteIssuer.claim(bobInvite);
+    const bobExclInvite = await invitationIssuer.claim(bobInvite);
     const bobInstanceHandle = await getInstanceHandle(bobExclInvite);
     const {
       publicAPI: bobAutoswap,

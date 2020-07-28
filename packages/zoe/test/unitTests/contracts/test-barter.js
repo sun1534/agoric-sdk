@@ -24,8 +24,8 @@ test('barter with valid offers', async t => {
     simoleans,
   } = setup();
   const zoe = makeZoe(fakeVatAdmin);
-  const inviteIssuer = zoe.getInviteIssuer();
-  const getInstanceHandle = makeGetInstanceHandle(inviteIssuer);
+  const invitationIssuer = zoe.getInvitationIssuer();
+  const getInstanceHandle = makeGetInstanceHandle(invitationIssuer);
 
   // Pack the contract.
   const bundle = await bundleSource(barter);
@@ -72,7 +72,7 @@ test('barter with valid offers', async t => {
   const bobInvite = publicAPI.makeInvite();
 
   // 5: Bob decides to join.
-  const bobExclusiveInvite = await inviteIssuer.claim(bobInvite);
+  const bobExclusiveInvite = await invitationIssuer.claim(bobInvite);
 
   const { installationHandle: bobInstallationId } = zoe.getInstanceRecord(
     instanceHandle,

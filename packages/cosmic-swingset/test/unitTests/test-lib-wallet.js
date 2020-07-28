@@ -98,10 +98,10 @@ test('lib-wallet issuer and purse methods', async t => {
       inboxStateChangeLog,
       pursesStateChangeLog,
     } = await setupTest();
-    const inviteIssuer = await E(zoe).getInviteIssuer();
+    const invitationIssuer = await E(zoe).getInvitationIssuer();
     t.deepEquals(
       wallet.getIssuers(),
-      [['zoe invite', inviteIssuer]],
+      [['zoe invite', invitationIssuer]],
       `wallet starts off with only the zoe invite issuer`,
     );
     await wallet.addIssuer('moola', moolaBundle.issuer);
@@ -109,7 +109,7 @@ test('lib-wallet issuer and purse methods', async t => {
     t.deepEquals(
       wallet.getIssuers(),
       [
-        ['zoe invite', inviteIssuer],
+        ['zoe invite', invitationIssuer],
         ['moola', moolaBundle.issuer],
         ['rpg', rpgBundle.issuer],
       ],
@@ -206,11 +206,11 @@ test('lib-wallet dapp suggests issuer, instance, installation petnames', async t
     // that we withdraw an invite for the offer during the
     // `addOffer` call, so any invites associated with an offer are no
     // longer in the purse.
-    const inviteIssuer = await E(zoe).getInviteIssuer();
+    const invitationIssuer = await E(zoe).getInvitationIssuer();
     const zoeInvitePurse = await E(wallet).getPurse('Default Zoe invite purse');
     const {
       value: [{ handle: inviteHandle, installationHandle }],
-    } = await E(inviteIssuer).getAmountOf(invite);
+    } = await E(invitationIssuer).getAmountOf(invite);
     const inviteHandleBoardId1 = await E(board).getId(inviteHandle);
     await wallet.deposit('Default Zoe invite purse', invite);
 
@@ -242,7 +242,7 @@ test('lib-wallet dapp suggests issuer, instance, installation petnames', async t
     const invite2 = await E(publicAPI).makeInvite();
     const {
       value: [{ handle: inviteHandle2 }],
-    } = await E(inviteIssuer).getAmountOf(invite2);
+    } = await E(invitationIssuer).getAmountOf(invite2);
     await wallet.deposit('Default Zoe invite purse', invite2);
 
     const currentAmount = await E(zoeInvitePurse).getCurrentAmount();
@@ -531,10 +531,10 @@ test('lib-wallet offer methods', async t => {
       moolaBundle.mint.mintPayment(moolaBundle.amountMath.make(100)),
     );
 
-    const inviteIssuer = await E(zoe).getInviteIssuer();
+    const invitationIssuer = await E(zoe).getInvitationIssuer();
     const {
       value: [{ handle: inviteHandle, installationHandle }],
-    } = await E(inviteIssuer).getAmountOf(invite);
+    } = await E(invitationIssuer).getAmountOf(invite);
     const inviteHandleBoardId1 = await E(board).getId(inviteHandle);
     await wallet.deposit('Default Zoe invite purse', invite);
     const instanceHandleBoardId = await E(board).getId(instanceHandle);
@@ -607,7 +607,7 @@ test('lib-wallet offer methods', async t => {
     const invite2 = await E(publicAPI).makeInvite();
     const {
       value: [{ handle: inviteHandle2 }],
-    } = await E(inviteIssuer).getAmountOf(invite2);
+    } = await E(invitationIssuer).getAmountOf(invite2);
     const inviteHandleBoardId2 = await E(board).getId(inviteHandle2);
     const offer2 = formulateBasicOffer(rawId2, inviteHandleBoardId2);
     await wallet.deposit('Default Zoe invite purse', invite2);
@@ -805,13 +805,13 @@ test('lib-wallet addOffer for autoswap swap', async t => {
     await addLiqOutcome;
 
     const invite = await E(publicAPI).makeSwapInvite();
-    const inviteIssuer = await E(zoe).getInviteIssuer();
+    const invitationIssuer = await E(zoe).getInvitationIssuer();
     const {
       value: [{ handle: inviteHandle }],
-    } = await E(inviteIssuer).getAmountOf(invite);
+    } = await E(invitationIssuer).getAmountOf(invite);
     const inviteHandleBoardId = await E(board).getId(inviteHandle);
 
-    // add inviteIssuer and create invite purse
+    // add invitationIssuer and create invite purse
     await wallet.deposit('Default Zoe invite purse', invite);
 
     const rawId = '1593482020370';

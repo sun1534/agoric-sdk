@@ -1,7 +1,15 @@
 // @ts-check
 
 import { produceNotifier } from '@agoric/notifier';
-import { makeZoeHelpers, defaultAcceptanceMsg } from '../contractSupport';
+import {
+  rejectOffer,
+  checkIfProposal,
+  swap,
+  satisfies,
+  getActiveOffers,
+  assertKeywords,
+  defaultAcceptanceMsg,
+} from '../contractSupport';
 
 /**
  * SimpleExchange is an exchange with a simple matching algorithm, which allows
@@ -25,72 +33,53 @@ import { makeZoeHelpers, defaultAcceptanceMsg } from '../contractSupport';
  * @typedef {import('../zoe').ContractFacet} ContractFacet
  * @param {ContractFacet} zcf
  */
-const makeContract = zcf => {
-  let sellOfferHandles = [];
-  let buyOfferHandles = [];
+const execute = (zcf, terms) => {
+  let sellSeats = [];
+  let buySeats = [];
   // eslint-disable-next-line no-use-before-define
   const { notifier, updater } = produceNotifier(getBookOrders());
-
-  const {
-    rejectOffer,
-    checkIfProposal,
-    swap,
-    satisfies,
-    getActiveOffers,
-    assertKeywords,
-  } = makeZoeHelpers(zcf);
-
   assertKeywords(harden(['Asset', 'Price']));
 
-  function flattenOffer(o) {
-    return {
-      want: o.proposal.want,
-      give: o.proposal.give,
-    };
-  }
+  const describeSeat = seat => {
+    const proposal = seat.getProposal();
+    return harden({
+      want: proposal.want,
+      give: proposal.give,
+    });
+  };
 
-  function flattenOrders(offerHandles) {
-    const result = zcf
-      .getOffers(zcf.getOfferStatuses(offerHandles).active)
-      .map(offerRecord => flattenOffer(offerRecord));
-    return result;
-  }
-
-  function getBookOrders() {
-    return {
-      buys: flattenOrders(buyOfferHandles),
-      sells: flattenOrders(sellOfferHandles),
-    };
-  }
-
-  function getOffer(offerHandle) {
-    for (const handle of [...sellOfferHandles, ...buyOfferHandles]) {
-      if (offerHandle === handle) {
-        return flattenOffer(getActiveOffers([offerHandle])[0]);
+  const describeSeats = seats => {
+    const result = [];
+    seats.forEach(seat => {
+      if (!seat.didExit()) {
+        result.push(describeSeat(seat));
       }
-    }
-    return 'not an active offer';
-  }
+    });
+  };
+
+  const getBookOrders = () =>
+    harden({
+      buys: describeSeats(buySeats),
+      sells: describeSeats(sellSeats),
+    });
 
   // Tell the notifier that there has been a change to the book orders
-  function bookOrdersChanged() {
-    updater.updateState(getBookOrders());
-  }
+  const bookOrdersChanged = () => updater.updateState(getBookOrders());
 
   // If there's an existing offer that this offer is a match for, make the trade
   // and return the handle for the matched offer. If not, return undefined, so
   // the caller can know to add the new offer to the book.
-  function swapIfCanTrade(offerHandles, offerHandle) {
-    for (const iHandle of offerHandles) {
-      const satisfiedBy = (xHandle, yHandle) =>
-        satisfies(xHandle, zcf.getCurrentAllocation(yHandle));
+  function swapIfCanTrade(seats, newSeat) {
+    for (const existingSeat of seats) {
+      const satisfiedBy = (xSeat, ySeat) =>
+        satisfies(xSeat, ySeat.getCurrentAllocation());
       if (
-        satisfiedBy(iHandle, offerHandle) &&
-        satisfiedBy(offerHandle, iHandle)
+        satisfiedBy(existingSeat, newSeat) &&
+        satisfiedBy(newSeat, existingSeat)
       ) {
-        swap(offerHandle, iHandle);
-        // return handle to remove
-        return iHandle;
+        swap(existingSeat, newSeat);
+        // return seat to remove
+        return existingSeat;
       }
     }
     return undefined;
@@ -100,20 +89,20 @@ const makeContract = zcf => {
   // the matching offer and return the remaining counterOffers. If there's no
   // matching offer, add the offerHandle to the coOffers, and return the
   // unmodified counterOfffers
-  function swapIfCanTradeAndUpdateBook(counterOffers, coOffers, offerHandle) {
-    const handle = swapIfCanTrade(counterOffers, offerHandle);
-    if (handle) {
+  function swapIfCanTradeAndUpdateBook(counterOffers, coOffers, tradeSeat) {
+    const matchSeat = swapIfCanTrade(counterOffers, tradeSeat);
+    if (matchSeat) {
       // remove the matched offer.
-      counterOffers = counterOffers.filter(value => value !== handle);
+      counterOffers = counterOffers.filter(value => value !== matchSeat);
     } else {
       // Save the order in the book
-      coOffers.push(offerHandle);
+      coOffers.push(tradeSeat);
     }
 
     return counterOffers;
   }
 
-  const exchangeOfferHook = offerHandle => {
+  const makeTrade = tradeSeat => {
     const buyAssetForPrice = harden({
       give: { Price: null },
       want: { Asset: null },
@@ -122,40 +111,29 @@ const makeContract = zcf => {
       give: { Asset: null },
       want: { Price: null },
     });
-    if (checkIfProposal(offerHandle, sellAssetForPrice)) {
-      buyOfferHandles = swapIfCanTradeAndUpdateBook(
-        buyOfferHandles,
-        sellOfferHandles,
-        offerHandle,
-      );
+    if (checkIfProposal(tradeSeat, sellAssetForPrice)) {
+      buySeats = swapIfCanTradeAndUpdateBook(buySeats, sellSeats, tradeSeat);
       /* eslint-disable no-else-return */
-    } else if (checkIfProposal(offerHandle, buyAssetForPrice)) {
-      sellOfferHandles = swapIfCanTradeAndUpdateBook(
-        sellOfferHandles,
-        buyOfferHandles,
-        offerHandle,
-      );
+    } else if (checkIfProposal(tradeSeat, buyAssetForPrice)) {
+      sellSeats = swapIfCanTradeAndUpdateBook(sellSeats, buySeats, tradeSeat);
     } else {
       // Eject because the offer must be invalid
-      return rejectOffer(offerHandle);
+      throw tradeSeat.kickOut();
     }
     bookOrdersChanged();
     return defaultAcceptanceMsg;
   };
 
-  const makeExchangeInvite = () =>
-    zcf.makeInvitation(exchangeOfferHook, 'exchange');
-
   zcf.initPublicAPI(
     harden({
-      makeInvite: makeExchangeInvite,
-      getOffer,
+      makeInvite: () => zcf.makeInvitation(makeTrade, 'exchange'),
       getNotifier: () => notifier,
     }),
   );
 
-  return makeExchangeInvite();
+  const admin = harden({});
+  return admin;
 };
 
-harden(makeContract);
-export { makeContract };
+harden(execute);
+export { execute };

@@ -76,9 +76,9 @@ function build(log) {
 
         const fooInviteP = E(installationP).spawn('foo terms');
 
-        const inviteIssuerP = E(host).getInviteIssuer();
+        const invitationIssuerP = E(host).getInvitationIssuer();
         return Promise.resolve(
-          showPaymentBalance('foo', inviteIssuerP, fooInviteP),
+          showPaymentBalance('foo', invitationIssuerP, fooInviteP),
         ).then(_ => {
           const eightP = E(host).redeem(fooInviteP);
 

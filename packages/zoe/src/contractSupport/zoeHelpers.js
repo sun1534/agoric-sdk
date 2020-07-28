@@ -1,7 +1,7 @@
 import { assert, details } from '@agoric/assert';
 import { sameStructure } from '@agoric/same-structure';
 import { E, HandledPromise } from '@agoric/eventual-send';
-import { satisfiesWant, isOfferSafe } from '../offerSafety';
+import { satisfiesWant, isOfferSafe } from '../zoeContractFacet/offerSafety';
 
 export const defaultRejectMsg = `The offer was invalid. Please check your refund.`;
 export const defaultAcceptanceMsg = `The offer has been accepted. Once the contract has been completed, please check your payout`;
@@ -16,26 +16,21 @@ const getKeysSorted = obj =>
  */
 // zcf only picks up the type if the param is in parens, which eslint dislikes
 // eslint-disable-next-line
-export const makeZoeHelpers = (zcf) => {
+export const makeZoeHelpers = () => {
   const zoeService = zcf.getZoeService();
-
-  const rejectOffer = (offerHandle, msg = defaultRejectMsg) => {
-    zcf.complete(harden([offerHandle]));
-    assert.fail(msg);
-  };
 
   // Compare the keys of actual with expected keys and reject offer if
   // not sameStructure. If expectedKeys is undefined, no comparison occurs.
   const rejectKeysIf = (
-    offerHandle,
+    seat,
     actual,
     expected,
-    msg = defaultRejectMsg,
+    msg,
     // eslint-disable-next-line consistent-return
   ) => {
     if (expected !== undefined) {
       if (!sameStructure(getKeysSorted(actual), getKeysSorted(expected))) {
-        return rejectOffer(offerHandle, msg);
+        throw seat.kickOut(msg);
       }
     }
   };
@@ -126,8 +121,8 @@ export const makeZoeHelpers = (zcf) => {
 
   const helpers = harden({
     getKeys,
-    assertKeywords: expected => {
-      const { issuerKeywordRecord } = zcf.getInstanceRecord();
+    assertKeywords: (zcf, expected) => {
+      const issuerKeywordRecord = zcf.getIssuerKeywordRecord();
       const actual = getKeysSorted(issuerKeywordRecord);
       expected = [...expected]; // in case hardened
       expected.sort();
@@ -136,14 +131,14 @@ export const makeZoeHelpers = (zcf) => {
         details`keywords: ${actual} were not as expected: ${expected}`,
       );
     },
-    rejectIfNotProposal: (offerHandle, expected) => {
-      const { proposal: actual } = zcf.getOffer(offerHandle);
-      rejectKeysIf(offerHandle, actual.give, expected.give);
-      rejectKeysIf(offerHandle, actual.want, expected.want);
-      rejectKeysIf(offerHandle, actual.exit, expected.exit);
+    rejectIfNotProposal: (seat, expected) => {
+      const actual = seat.getProposal();
+      rejectKeysIf(seat, actual.give, expected.give);
+      rejectKeysIf(seat, actual.want, expected.want);
+      rejectKeysIf(seat, actual.exit, expected.exit);
     },
-    checkIfProposal: (offerHandle, expected) => {
-      const { proposal: actual } = zcf.getOffer(offerHandle);
+    checkIfProposal: (seat, expected) => {
+      const actual = seat.getProposal();
       return (
         // Check that the "give" keys match expected keys.
         checkKeys(actual.give, expected.give) &&
@@ -153,9 +148,6 @@ export const makeZoeHelpers = (zcf) => {
         checkKeys(actual.exit, expected.exit)
       );
     },
-    getActiveOffers: handles =>
-      zcf.getOffers(zcf.getOfferStatuses(handles).active),
-    rejectOffer,
 
     /**
      * Check whether an update to currentAllocation satisfies
@@ -168,29 +160,11 @@ export const makeZoeHelpers = (zcf) => {
      * @param {allocation} amountKeywordRecord
      * @returns {boolean}
      */
-    satisfies: (offerHandle, allocation) => {
-      const currentAllocation = zcf.getCurrentAllocation(offerHandle);
+    satisfies: (getAmountMath, seat, allocation) => {
+      const currentAllocation = seat.getCurrentAllocation();
       const newAllocation = mergeAllocations(currentAllocation, allocation);
-      const { proposal } = zcf.getOffer(offerHandle);
-      return satisfiesWant(zcf.getAmountMath, proposal, newAllocation);
-    },
-
-    /**
-     * Check whether an update to currentAllocation satisfies offer
-     * safety. Note that this is the equivalent of `satisfiesWant` ||
-     * `satisfiesGive`. Allocation is merged with currentAllocation
-     * (allocations' values prevailing if the keywords are the same)
-     * to produce the newAllocation.
-
-     * @param {OfferHandle} offerHandle
-     * @param {AmountKeywordRecord} allocation
-     * @returns {boolean}
-     */
-    isOfferSafe: (offerHandle, allocation) => {
-      const currentAllocation = zcf.getCurrentAllocation(offerHandle);
-      const newAllocation = mergeAllocations(currentAllocation, allocation);
-      const { proposal } = zcf.getOffer(offerHandle);
-      return isOfferSafe(zcf.getAmountMath, proposal, newAllocation);
+      const proposal = seat.getProposal();
+      return satisfiesWant(getAmountMath, proposal, newAllocation);
     },
 
     /**
@@ -210,13 +184,13 @@ export const makeZoeHelpers = (zcf) => {
      * If losses is not defined, the gains of the other offer is
      * subtracted.
      */
-    trade: (keepLeft, tryRight) => {
+    trade: (reallocate, keepLeft, tryRight) => {
       assert(
-        keepLeft.offerHandle !== tryRight.offerHandle,
-        details`an offer cannot trade with itself`,
+        keepLeft.seat !== tryRight.seat,
+        details`a seat cannot trade with itself`,
       );
-      let leftAllocation = zcf.getCurrentAllocation(keepLeft.offerHandle);
-      let rightAllocation = zcf.getCurrentAllocation(tryRight.offerHandle);
+      let leftAllocation = keepLeft.getCurrentAllocation();
+      let rightAllocation = tryRight.getCurrentAllocation();
 
       try {
         // for all the keywords and amounts in leftGains, transfer from
@@ -234,7 +208,7 @@ export const makeZoeHelpers = (zcf) => {
           keepLeft.losses,
         ));
       } catch (err) {
-        return rejectOffer(tryRight.offerHandle);
+        throw tryRight.kickOut();
       }
 
       // Check whether reallocate would error before calling. If
@@ -258,7 +232,7 @@ export const makeZoeHelpers = (zcf) => {
         );
         console.log(`proposed left reallocation`, leftAllocation);
         console.log(`proposed right reallocation`, rightAllocation);
-        // show the contraints
+        // show the constraints
         console.log(
           `left want`,
           zcf.getOffer(keepLeft.offerHandle).proposal.want,
@@ -274,12 +248,9 @@ export const makeZoeHelpers = (zcf) => {
         if (!offerSafeForRight) {
           console.log(`offer not safe for right`);
         }
-        return rejectOffer(tryRight.offerHandle);
+        throw tryRight.kickOut();
       }
-      zcf.reallocate(
-        [keepLeft.offerHandle, tryRight.offerHandle],
-        [leftAllocation, rightAllocation],
-      );
+      reallocate(keepLeft, tryRight);
       return undefined;
     },
 

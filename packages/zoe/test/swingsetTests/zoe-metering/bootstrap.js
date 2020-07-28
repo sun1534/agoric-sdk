@@ -30,8 +30,8 @@ function build(log) {
       try {
         const installId = await installations[testName]();
         log(`instantiating ${testName}`);
-        const inviteIssuer = E(zoe).getInviteIssuer();
-        const issuerKeywordRecord = harden({ Keyword1: inviteIssuer });
+        const invitationIssuer = E(zoe).getInvitationIssuer();
+        const issuerKeywordRecord = harden({ Keyword1: invitationIssuer });
         const {
           instanceRecord: { publicAPI },
         } = await E(zoe).makeInstance(installId, issuerKeywordRecord);

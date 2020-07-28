@@ -26,7 +26,7 @@ test('simpleExchange with valid offers', async t => {
     simoleans,
   } = setup();
   const zoe = makeZoe(fakeVatAdmin);
-  const inviteIssuer = zoe.getInviteIssuer();
+  const invitationIssuer = zoe.getInvitationIssuer();
 
   // Pack the contract.
   const bundle = await bundleSource(simpleExchange);
@@ -108,8 +108,8 @@ test('simpleExchange with valid offers', async t => {
   const bobInvite = publicAPI.makeInvite();
 
   // 5: Bob decides to join.
-  const bobExclusiveInvite = await inviteIssuer.claim(bobInvite);
-  const getInstanceHandle = makeGetInstanceHandle(inviteIssuer);
+  const bobExclusiveInvite = await invitationIssuer.claim(bobInvite);
+  const getInstanceHandle = makeGetInstanceHandle(invitationIssuer);
   const bobInstanceHandle = await getInstanceHandle(bobExclusiveInvite);
 
   const {
@@ -210,7 +210,7 @@ test('simpleExchange with multiple sell offers', async t => {
       simoleans,
     } = setup();
     const zoe = makeZoe(fakeVatAdmin);
-    const inviteIssuer = zoe.getInviteIssuer();
+    const invitationIssuer = zoe.getInvitationIssuer();
 
     // Pack the contract.
     const bundle = await bundleSource(simpleExchange);
@@ -254,7 +254,7 @@ test('simpleExchange with multiple sell offers', async t => {
     );
 
     // 5: Alice adds another sell order to the exchange
-    const aliceInvite2 = await inviteIssuer.claim(publicAPI.makeInvite());
+    const aliceInvite2 = await invitationIssuer.claim(publicAPI.makeInvite());
     const aliceSale2OrderProposal = harden({
       give: { Asset: moola(5) },
       want: { Price: simoleans(8) },
@@ -267,7 +267,7 @@ test('simpleExchange with multiple sell offers', async t => {
     );
 
     // 5: Alice adds a buy order to the exchange
-    const aliceInvite3 = await inviteIssuer.claim(publicAPI.makeInvite());
+    const aliceInvite3 = await invitationIssuer.claim(publicAPI.makeInvite());
     const aliceBuyOrderProposal = harden({
       give: { Price: simoleans(18) },
       want: { Asset: moola(29) },
@@ -358,7 +358,7 @@ test('simpleExchange with non-fungible assets', async t => {
   } = setupNonFungible();
 
   const zoe = makeZoe(fakeVatAdmin);
-  const inviteIssuer = zoe.getInviteIssuer();
+  const invitationIssuer = zoe.getInvitationIssuer();
 
   // Pack the contract.
   const bundle = await bundleSource(simpleExchange);
@@ -405,8 +405,8 @@ test('simpleExchange with non-fungible assets', async t => {
   const bobInvite = publicAPI.makeInvite();
 
   // 5: Bob decides to join.
-  const bobExclusiveInvite = await inviteIssuer.claim(bobInvite);
-  const getInstanceHandle = makeGetInstanceHandle(inviteIssuer);
+  const bobExclusiveInvite = await invitationIssuer.claim(bobInvite);
+  const getInstanceHandle = makeGetInstanceHandle(invitationIssuer);
   const bobInstanceHandle = await getInstanceHandle(bobExclusiveInvite);
 
   const {

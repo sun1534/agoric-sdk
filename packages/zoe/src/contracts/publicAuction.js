@@ -5,7 +5,7 @@ import Nat from '@agoric/nat';
 // Eventually will be importable from '@agoric/zoe-contract-support'
 import {
   defaultAcceptanceMsg,
-  makeZoeHelpers,
+  rejectOffer, satisfies, assertKeywords, checkHook,
   secondPriceLogic,
   closeAuction,
 } from '../contractSupport';
@@ -32,66 +32,59 @@ import {
  * @typedef {import('../zoe').ContractFacet} ContractFacet
  * @param {ContractFacet} zcf
  */
-const makeContract = zcf => {
-  const { rejectOffer, satisfies, assertKeywords, checkHook } = makeZoeHelpers(
-    zcf,
-  );
+const execute = (zcf, { numBidsAllowed = 3 }) => {
+  numBidsAllowed = Nat(numBidsAllowed);
 
-  let {
-    terms: { numBidsAllowed },
-  } = zcf.getInstanceRecord();
-  numBidsAllowed = Nat(numBidsAllowed !== undefined ? numBidsAllowed : 3);
-
-  let sellerOfferHandle;
+  let sellerSeat;
   let minimumBid;
   let auctionedAssets;
-  const allBidHandles = [];
+  const allBidderSeats = [];
 
   // seller will use 'Asset' and 'Ask'. buyer will use 'Asset' and 'Bid'
   assertKeywords(harden(['Asset', 'Ask']));
 
-  const bidderOfferHook = offerHandle => {
+  const bid = bidderSeat => {
     // Check that the item is still up for auction
-    if (!zcf.isOfferActive(sellerOfferHandle)) {
+    if (sellerSeat.didExit()) {
       const rejectMsg = `The item up for auction is not available or the auction has completed`;
-      throw rejectOffer(offerHandle, rejectMsg);
+      throw bidderSeat.kickOut(rejectMsg);
     }
-    if (allBidHandles.length >= numBidsAllowed) {
-      throw rejectOffer(offerHandle, `No further bids allowed.`);
+    if (allBidderSeats.length >= numBidsAllowed) {
+      throw bidderSeat.kickOut(`No further bids allowed.`);
     }
-    const sellerSatisfied = satisfies(sellerOfferHandle, {
-      Ask: zcf.getCurrentAllocation(offerHandle).Bid,
+    const sellerSatisfied = satisfies(sellerSeat, {
+      Ask: bidderSeat.getCurrentAllocation().Bid,
       Asset: zcf.getAmountMath(auctionedAssets.brand).getEmpty(),
     });
-    const bidderSatisfied = satisfies(offerHandle, {
-      Asset: zcf.getCurrentAllocation(sellerOfferHandle).Asset,
+    const bidderSatisfied = satisfies(bidderSeat, {
+      Asset: sellerSeat.getCurrentAllocation().Asset,
       Bid: zcf.getAmountMath(minimumBid.brand).getEmpty(),
     });
     if (!(sellerSatisfied && bidderSatisfied)) {
       const rejectMsg = `Bid was under minimum bid or for the wrong assets`;
-      throw rejectOffer(offerHandle, rejectMsg);
+      throw bidderSeat.kickOut(rejectMsg);
     }
 
     // Save valid bid and try to close.
-    allBidHandles.push(offerHandle);
-    if (allBidHandles.length >= numBidsAllowed) {
+    allBidderSeats.push(bidderSeat);
+    if (allBidderSeats.length >= numBidsAllowed) {
       closeAuction(zcf, {
         auctionLogicFn: secondPriceLogic,
-        sellerOfferHandle,
-        allBidHandles,
+        sellerSeat,
+        allBidderSeats,
       });
     }
     return defaultAcceptanceMsg;
   };
 
-  const bidderOfferExpected = harden({
+  const bidExpected = harden({
     give: { Bid: null },
     want: { Asset: null },
   });
 
   const makeBidderInvite = () =>
     zcf.makeInvitation(
-      checkHook(bidderOfferHook, bidderOfferExpected),
+      checkHook(bid, bidExpected),
       'bid',
       harden({
         customProperties: {
@@ -101,28 +94,25 @@ const makeContract = zcf => {
       }),
     );
 
-  const sellerOfferHook = offerHandle => {
+  const sell = seat => {
     if (auctionedAssets) {
-      throw rejectOffer(offerHandle, `assets already present`);
+      throw seat.kickOut(`assets already present`);
     }
-    // Save the valid offer
-    sellerOfferHandle = offerHandle;
-    const { proposal } = zcf.getOffer(offerHandle);
+    // Save the seat
+    sellerSeat = seat;
+    const proposal = sellerSeat.getProposal();
     auctionedAssets = proposal.give.Asset;
     minimumBid = proposal.want.Ask;
     return defaultAcceptanceMsg;
   };
 
-  const sellerOfferExpected = harden({
+  const sellExpected = harden({
     give: { Asset: null },
     want: { Ask: null },
   });
 
   const makeSellerInvite = () =>
-    zcf.makeInvitation(
-      checkHook(sellerOfferHook, sellerOfferExpected),
-      'sellAssets',
-    );
+    zcf.makeInvitation(checkHook(sell, sellExpected), 'sellAssets');
 
   zcf.initPublicAPI(
     harden({
@@ -141,8 +131,12 @@ const makeContract = zcf => {
     }),
   );
 
-  return makeSellerInvite();
+  const admin = harden({
+    makeSellerInvite,
+  });
+
+  return admin;
 };
 
-harden(makeContract);
-export { makeContract };
+harden(execute);
+export { execute };

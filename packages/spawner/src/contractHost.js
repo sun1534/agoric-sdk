@@ -34,18 +34,23 @@ function makeContractHost(vatPowers, additionalEndowments = {}) {
 
   const {
     mint: inviteMint,
-    issuer: inviteIssuer,
+    issuer: invitationIssuer,
     amountMath: inviteAmountMath,
   } = makeIssuerKit('contract host', 'set');
 
   function redeem(allegedInvitePayment) {
-    return inviteIssuer.getAmountOf(allegedInvitePayment).then(inviteAmount => {
-      assert(!inviteAmountMath.isEmpty(inviteAmount), details`No invites left`);
-      const [{ seatIdentity }] = inviteAmountMath.getValue(inviteAmount);
-      return Promise.resolve(
-        inviteIssuer.burn(allegedInvitePayment, inviteAmount),
-      ).then(_ => seats.get(seatIdentity));
-    });
+    return invitationIssuer
+      .getAmountOf(allegedInvitePayment)
+      .then(inviteAmount => {
+        assert(
+          !inviteAmountMath.isEmpty(inviteAmount),
+          details`No invites left`,
+        );
+        const [{ seatIdentity }] = inviteAmountMath.getValue(inviteAmount);
+        return Promise.resolve(
+          invitationIssuer.burn(allegedInvitePayment, inviteAmount),
+        ).then(_ => seats.get(seatIdentity));
+      });
   }
 
   function myRequire(what) {
@@ -84,8 +89,8 @@ function makeContractHost(vatPowers, additionalEndowments = {}) {
 
   /** The contract host is designed to have a long-lived credible identity. */
   const contractHost = harden({
-    getInviteIssuer() {
-      return inviteIssuer;
+    getInvitationIssuer() {
+      return invitationIssuer;
     },
     // contractBundle is a record containing source code for the functions
     // comprising a contract, as created by bundle-source. `spawn` evaluates

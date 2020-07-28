@@ -19,9 +19,9 @@
  * @typedef {Object} ZoeService
  * Zoe provides a framework for deploying and working with smart contracts. It
  * is accessed as a long-lived and well-trusted service that enforces offer
- * safety for the contracts that use it. Zoe has a single `inviteIssuer` for
+ * safety for the contracts that use it. Zoe has a single `invitationIssuer` for
  * the entirety of its lifetime. By having a reference to Zoe, a user can get
- * the `inviteIssuer` and thus validate any `invite` they receive from someone
+ * the `invitationIssuer` and thus validate any `invite` they receive from someone
  * else.
  *
  * Zoe has two different facets: the public Zoe service and the contract facet
@@ -32,11 +32,11 @@
  * outside of its vat, and create a new offer for record-keeping and other
  * purposes.
  *
- * @property {() => Issuer} getInviteIssuer
- * Zoe has a single `inviteIssuer` for the entirety of its lifetime.
- * By having a reference to Zoe, a user can get the `inviteIssuer`
+ * @property {() => Issuer} getInvitationIssuer
+ * Zoe has a single `invitationIssuer` for the entirety of its lifetime.
+ * By having a reference to Zoe, a user can get the `invitationIssuer`
  * and thus validate any `invite` they receive from someone else. The
- * mint associated with the inviteIssuer creates the ERTP payments
+ * mint associated with the invitationIssuer creates the ERTP payments
  * that represent the right to interact with a smart contract in
  * particular ways.
  *
@@ -47,7 +47,7 @@
  * @property {(installationHandle: InstallationHandle,
  *             issuerKeywordRecord: IssuerKeywordRecord,
  *             terms?: object)
- *            => Promise<InviteIssuerRecord>} makeInstance
+ *            => Promise<InvitationIssuerRecord>} makeInstance
  * Zoe is long-lived. We can use Zoe to create smart contract
  * instances by specifying a particular contract installation to
  * use, as well as the `issuerKeywordRecord` and `terms` of the contract. The

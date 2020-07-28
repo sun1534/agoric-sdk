@@ -1,9 +1,7 @@
 // @ts-check
 
 // Eventually will be importable from '@agoric/zoe-contract-support'
-import { makeZoeHelpers } from '../contractSupport';
-
-const rejectMsg = `The covered call option is expired.`;
+import { swap, assertKeywords, checkHook } from '../contractSupport';
 
 /**
  * In a covered call, a digital asset's owner sells a call
@@ -35,24 +33,22 @@ const rejectMsg = `The covered call option is expired.`;
  * @typedef {import('../zoe').ContractFacet} ContractFacet
  * @param {ContractFacet} zcf
  */
-const makeContract = zcf => {
-  const { swap, assertKeywords, checkHook } = makeZoeHelpers(zcf);
+const execute = (zcf, _terms) => {
+  const rejectMsg = `The covered call option is expired.`;
   assertKeywords(harden(['UnderlyingAsset', 'StrikePrice']));
 
-  const makeCallOptionInvite = sellerHandle => {
-    const {
-      proposal: { want, give, exit },
-    } = zcf.getOffer(sellerHandle);
+  const writeOption = sellerSeat => {
+    const { want, give, exit } = sellerSeat.getProposal();
 
-    const exerciseOptionHook = offerHandle =>
-      swap(sellerHandle, offerHandle, rejectMsg);
+    const exerciseOption = buyerSeat => swap(sellerSeat, buyerSeat, rejectMsg);
+
     const exerciseOptionExpected = harden({
       give: { StrikePrice: null },
       want: { UnderlyingAsset: null },
     });
 
     return zcf.makeInvitation(
-      checkHook(exerciseOptionHook, exerciseOptionExpected),
+      checkHook(exerciseOption, exerciseOptionExpected),
       'exerciseOption',
       harden({
         customProperties: {
@@ -71,11 +67,16 @@ const makeContract = zcf => {
     exit: { afterDeadline: null },
   });
 
-  return zcf.makeInvitation(
-    checkHook(makeCallOptionInvite, writeOptionExpected),
-    'makeCallOption',
-  );
+  const admin = harden({
+    makeWriteOptionInvite: () =>
+      zcf.makeInvitation(
+        checkHook(writeOption, writeOptionExpected),
+        'makeCallOption',
+      ),
+  });
+
+  return admin;
 };
 
-harden(makeContract);
-export { makeContract };
+harden(execute);
+export { execute };

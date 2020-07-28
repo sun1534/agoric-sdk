@@ -1,7 +1,11 @@
 // @ts-check
 
 // Eventually will be importable from '@agoric/zoe-contract-support'
-import { makeZoeHelpers } from '../contractSupport';
+import {
+  swap,
+  assertKeywords,
+  checkProposalKeywords,
+} from '../contractSupport';
 
 /**
  * Trade one item for another.
@@ -15,17 +19,16 @@ import { makeZoeHelpers } from '../contractSupport';
  * @typedef {import('../zoe').ContractFacet} ContractFacet
  * @param {ContractFacet} zcf
  */
-const makeContract = zcf => {
-  const { swap, assertKeywords, checkHook } = makeZoeHelpers(zcf);
-  assertKeywords(harden(['Asset', 'Price']));
+const execute = (zcf, _terms) => {
+  assertKeywords(zcf, harden(['Asset', 'Price']));
 
-  const makeMatchingInvite = firstOfferHandle => {
-    const {
-      proposal: { want, give },
-    } = zcf.getOffer(firstOfferHandle);
+  const makeMatchingInvite = firstSeat => {
+    const { want, give } = firstSeat.getProposal();
 
-    return zcf.makeInvitation(
-      offerHandle => swap(firstOfferHandle, offerHandle),
+    const secondSeatOfferHandler = secondSeat => swap(firstSeat, secondSeat);
+
+    const secondSeatInvite = zcf.makeInvitation(
+      secondSeatOfferHandler,
       'matchOffer',
       harden({
         customProperties: {
@@ -34,18 +37,26 @@ const makeContract = zcf => {
         },
       }),
     );
+    return secondSeatInvite;
   };
 
-  const firstOfferExpected = harden({
+  const firstProposalExpected = harden({
     give: { Asset: null },
     want: { Price: null },
   });
 
-  return zcf.makeInvitation(
-    checkHook(makeMatchingInvite, firstOfferExpected),
-    'firstOffer',
-  );
+  const adminFacet = harden({
+    makeFirstSeatInvite: () =>
+      zcf.makeInvitation(
+        checkProposalKeywords(makeMatchingInvite, firstProposalExpected),
+        'firstOffer',
+      ),
+  });
+
+  const publicFacet = harden({});
+
+  return { adminFacet, publicFacet };
 };
 
-harden(makeContract);
-export { makeContract };
+harden(execute);
+export { execute };

@@ -7,7 +7,11 @@ import {
   getInputPrice,
   calcLiqValueToMint,
   calcValueToRemove,
-  makeZoeHelpers,
+  makeEmptyOffer,
+  checkHook,
+  escrowAndAllocateTo,
+  assertNatMathHelpers,
+  trade,
 } from '../contractSupport';
 
 /**
@@ -24,7 +28,7 @@ import {
  * @typedef {import('../zoe').ContractFacet} ContractFacet
  * @param {ContractFacet} zcf
  */
-const makeContract = zcf => {
+const execute = (zcf, terms) => {
   // Create the liquidity mint and issuer.
   const {
     mint: liquidityMint,
@@ -34,16 +38,10 @@ const makeContract = zcf => {
 
   let liqTokenSupply = 0;
 
-  const {
-    makeEmptyOffer,
-    checkHook,
-    escrowAndAllocateTo,
-    assertNatMathHelpers,
-    trade,
-  } = makeZoeHelpers(zcf);
+  const liquidityIssuerAddedP = zcf.addNewIssuer(liquidityIssuer, 'Liquidity');
+  
 
-  return zcf.addNewIssuer(liquidityIssuer, 'Liquidity').then(() => {
-    const { brandKeywordRecord } = zcf.getInstanceRecord();
+    const brandKeywordRecord = zcf.getBrandKeywordRecord();
     Object.values(brandKeywordRecord).forEach(brand =>
       assertNatMathHelpers(brand),
     );
@@ -263,5 +261,5 @@ const makeContract = zcf => {
   });
 };
 
-harden(makeContract);
-export { makeContract };
+harden(execute);
+export { execute };

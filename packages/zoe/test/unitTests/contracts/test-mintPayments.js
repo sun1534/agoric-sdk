@@ -19,7 +19,7 @@ test('zoe - mint payments', async t => {
     // Pack the contract.
     const bundle = await bundleSource(mintPaymentsRoot);
     const installationHandle = await E(zoe).install(bundle);
-    const inviteIssuer = await E(zoe).getInviteIssuer();
+    const invitationIssuer = await E(zoe).getInvitationIssuer();
 
     // Alice creates a contract instance
     const {
@@ -29,7 +29,7 @@ test('zoe - mint payments', async t => {
     // Bob wants to get 1000 tokens so he gets an invite and makes an
     // offer
     const invite = await E(publicAPI).makeInvite();
-    t.ok(await E(inviteIssuer).isLive(invite), `valid invite`);
+    t.ok(await E(invitationIssuer).isLive(invite), `valid invite`);
     const { payout: payoutP } = await E(zoe).offer(invite);
 
     // Bob's payout promise resolves
@@ -59,7 +59,7 @@ test('zoe - mint payments with unrelated give and want', async t => {
     // Pack the contract.
     const bundle = await bundleSource(mintPaymentsRoot);
     const installationHandle = await E(zoe).install(bundle);
-    const inviteIssuer = await E(zoe).getInviteIssuer();
+    const invitationIssuer = await E(zoe).getInvitationIssuer();
 
     const moolaBundle = makeIssuerKit('moola');
     const simoleanBundle = makeIssuerKit('simolean');
@@ -76,7 +76,7 @@ test('zoe - mint payments with unrelated give and want', async t => {
     // Bob wants to get 1000 tokens so he gets an invite and makes an
     // offer
     const invite = await E(publicAPI).makeInvite();
-    t.ok(await E(inviteIssuer).isLive(invite), `valid invite`);
+    t.ok(await E(invitationIssuer).isLive(invite), `valid invite`);
     const proposal = harden({
       give: { Asset: moolaBundle.amountMath.make(10) },
       want: { Price: simoleanBundle.amountMath.make(100) },

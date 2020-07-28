@@ -79,19 +79,19 @@ test('home.wallet - receive zoe invite', async t => {
 
     // Check that the wallet knows about the Zoe invite issuer and starts out
     // with a default Zoe invite issuer purse.
-    const zoeInviteIssuer = await E(zoe).getInviteIssuer();
+    const zoeInvitationIssuer = await E(zoe).getInvitationIssuer();
     const issuers = await E(wallet).getIssuers();
     const issuersMap = new Map(issuers);
     t.deepEquals(
       issuersMap.get('zoe invite'),
-      zoeInviteIssuer,
+      zoeInvitationIssuer,
       `wallet knows about the Zoe invite issuer`,
     );
     const invitePurse = await E(wallet).getPurse('Default Zoe invite purse');
     const zoeInviteBrand = await E(invitePurse).getAllegedBrand();
     t.equals(
       zoeInviteBrand,
-      await E(zoeInviteIssuer).getBrand(),
+      await E(zoeInvitationIssuer).getBrand(),
       `invite purse is actually a zoe invite purse`,
     );
 

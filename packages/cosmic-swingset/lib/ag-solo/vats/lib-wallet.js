@@ -788,14 +788,14 @@ export async function makeWallet({
   // Make Zoe invite purse
   const ZOE_INVITE_BRAND_PETNAME = 'zoe invite';
   const ZOE_INVITE_PURSE_PETNAME = 'Default Zoe invite purse';
-  const inviteIssuerP = E(zoe).getInviteIssuer();
+  const invitationIssuerP = E(zoe).getInvitationIssuer();
   const addZoeIssuer = issuerP =>
     wallet.addIssuer(ZOE_INVITE_BRAND_PETNAME, issuerP);
   const makeInvitePurse = () =>
     wallet.makeEmptyPurse(ZOE_INVITE_BRAND_PETNAME, ZOE_INVITE_PURSE_PETNAME);
   const addInviteDepositFacet = () =>
     E(wallet).addDepositFacet(ZOE_INVITE_PURSE_PETNAME);
-  await addZoeIssuer(inviteIssuerP)
+  await addZoeIssuer(invitationIssuerP)
     .then(makeInvitePurse)
     .then(addInviteDepositFacet);
   zoeInvitePurse = wallet.getPurse(ZOE_INVITE_PURSE_PETNAME);

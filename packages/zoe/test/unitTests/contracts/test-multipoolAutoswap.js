@@ -19,7 +19,7 @@ test('multipoolAutoSwap with valid offers', async t => {
   try {
     const { moolaR, simoleanR, moola, simoleans } = setup();
     const zoe = makeZoe(fakeVatAdmin);
-    const inviteIssuer = zoe.getInviteIssuer();
+    const invitationIssuer = zoe.getInvitationIssuer();
 
     // Set up central token
     const centralR = makeIssuerKit('central');
@@ -53,9 +53,9 @@ test('multipoolAutoSwap with valid offers', async t => {
         E(issuer).getBrand(),
         E(issuer).getMathHelpersName(),
       ]).then(([brand, mathName]) => makeAmountMath(brand, mathName));
-    const inviteAmountMath = await makeAmountMathFromIssuer(inviteIssuer);
+    const inviteAmountMath = await makeAmountMathFromIssuer(invitationIssuer);
 
-    const aliceInviteAmount = await inviteIssuer.getAmountOf(aliceInvite);
+    const aliceInviteAmount = await invitationIssuer.getAmountOf(aliceInvite);
     t.deepEquals(
       aliceInviteAmount,
       inviteAmountMath.make(
@@ -185,7 +185,7 @@ test('multipoolAutoSwap with valid offers', async t => {
 
     const {
       value: [bobInviteValue],
-    } = await inviteIssuer.getAmountOf(bobSwapInvite1);
+    } = await invitationIssuer.getAmountOf(bobSwapInvite1);
     const {
       publicAPI: bobPublicAPI,
       installationHandle: bobInstallationId,

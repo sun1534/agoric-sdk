@@ -24,7 +24,7 @@ test('zoe - brokenAutomaticRefund', async t => {
   // 1: Alice tries to create an instance, but the contract is badly written.
   t.rejects(
     () => zoe.makeInstance(installationHandle, issuerKeywordRecord),
-    new Error('invites must be issued by InviteIssuer'),
+    new Error('invites must be issued by InvitationIssuer'),
     'makeInstance should have thrown',
   );
 });
