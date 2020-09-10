@@ -152,7 +152,7 @@
  *
  * If the payment is a promise, the operation will proceed upon resolution.
  *
- * @property {(payment: PaymentP, optAmount?: Amount) => Promise<Payment>} claim
+ * @property {(payment: PaymentP, optAmount?: Amount) => PaymentP} claim
  * Transfer all digital assets from the payment to a new payment and
  * delete the original. `optAmount` is optional.
  * If `optAmount` is present, the code will insist that the amount of
@@ -161,7 +161,7 @@
  *
  * If the payment is a promise, the operation will proceed upon resolution.
  *
- * @property {(paymentsArray: PaymentP[]) => Promise<Payment>} combine
+ * @property {(paymentsArray: PaymentP[]) => PaymentP} combine
  * Combine multiple payments into one payment.
  *
  * If any of the payments is a promise, the operation will proceed upon

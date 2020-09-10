@@ -101,7 +101,7 @@
  * @property {() => Promise<Allocation>} getCurrentAllocation
  * @property {() => Promise<ProposalRecord>} getProposal
  * @property {() => Promise<PaymentPKeywordRecord>} getPayouts
- * @property {(keyword: Keyword) => Promise<Payment>} getPayout
+ * @property {(keyword: Keyword) => PaymentP} getPayout
  * @property {() => Promise<OfferResult>} getOfferResult
  * @property {() => void=} tryExit
  * @property {() => Promise<boolean>} hasExited
@@ -115,9 +115,9 @@
 /**
  * @typedef {Object} StartInstanceResult
  * @property {any} creatorFacet
+ * @property {ERef<Invitation>=} creatorInvitation
  * @property {any} publicFacet
  * @property {Instance} instance
- * @property {Payment | undefined} creatorInvitation
  */
 
 /**

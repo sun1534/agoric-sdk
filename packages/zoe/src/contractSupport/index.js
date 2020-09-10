@@ -23,3 +23,5 @@ export {
   withdrawFromSeat,
   saveAllIssuers,
 } from './zoeHelpers';
+
+export { subContract } from './sub-contract';

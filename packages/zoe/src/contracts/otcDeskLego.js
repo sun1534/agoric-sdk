@@ -1,14 +1,14 @@
 // @ts-check
 
 import { E } from '@agoric/eventual-send';
-import { assert } from '@agoric/assert';
+import { assert, details } from '@agoric/assert';
 import {
   trade,
-  depositToSeat,
-  withdrawFromSeat,
   saveAllIssuers,
   assertProposalShape,
+  subContract,
 } from '../contractSupport';
+import { start as coveredCallStartFn } from './coveredCall';
 
 import '../../exported';
 
@@ -52,9 +52,7 @@ import '../../exported';
  * @type {ContractStartFn}
  */
 const start = zcf => {
-  const { coveredCallInstallation } = zcf.getTerms();
   const { zcfSeat: marketMakerSeat } = zcf.makeEmptySeatKit();
-  const zoe = zcf.getZoeService();
 
   /**
    * Make a quote using the current inventory and receive a covered
@@ -67,12 +65,18 @@ const start = zcf => {
    * @returns {Promise<Payment>}
    */
   const makeQuote = async (price, assets, timeAuthority, deadline) => {
-    const { creatorInvitation } = await E(zoe).startInstance(
-      coveredCallInstallation,
+    const { creatorInvitation: creatorInvitationP, offerService } = subContract(
+      zcf,
+      coveredCallStartFn,
+      'coveredCall',
       zcf.getTerms().issuers,
     );
-    const shouldBeInvitationMsg = `The covered call instance should return a creatorInvitation`;
-    assert(creatorInvitation, shouldBeInvitationMsg);
+    const creatorInvitation = await creatorInvitationP;
+    // AWAIT
+    assert(
+      creatorInvitation,
+      details`The covered call instance should return a creatorInvitation`,
+    );
     const proposal = harden({
       give: assets,
       want: price,
@@ -84,19 +88,33 @@ const start = zcf => {
       },
     });
 
-    const payments = await withdrawFromSeat(zcf, marketMakerSeat, assets);
-    const sellerUserSeat = await E(zoe).offer(
-      creatorInvitation,
-      proposal,
-      payments,
-    );
+    // TODO replace ADD and SUBTRACT with something real. Probably borrow logic
+    // from the trade helper.
+    const ADD = (_left, _right) => {
+      // TODO add the amountKeywordRecords together
+      return harden({});
+    };
+    const SUBTRACT = (_left, _right) => {
+      // TODO subtract amountKeywordRecord right from left
+      return harden({});
+    };
 
-    E(sellerUserSeat)
-      .getPayouts()
-      .then(async payoutPayments => {
-        const amounts = await E(sellerUserSeat).getCurrentAllocation();
-        await depositToSeat(zcf, marketMakerSeat, amounts, payoutPayments);
-      });
+    const mmsOldAllocation = marketMakerSeat.getCurrentAllocation();
+    const mmsNewAllocation = SUBTRACT(mmsOldAllocation, assets);
+    const paymentStaging = marketMakerSeat.stage(mmsNewAllocation);
+    const {
+      zcfSeat: sellerZcfSeat,
+      userSeat: sellerUserSeat,
+    } = offerService.offerNow(creatorInvitation, proposal, paymentStaging);
+
+    // @ts-ignore TODO figure out how to delay exactly long enough.
+    sellerZcfSeat.onExiting(allocation => {
+      const sellerStaging = sellerZcfSeat.stage({});
+      const mmsPreAllocation = marketMakerSeat.getCurrentAllocation();
+      const mmsPostAllocation = ADD(mmsPreAllocation, allocation);
+      const mmsStaging = marketMakerSeat.stage(mmsPostAllocation);
+      zcf.reallocate(sellerStaging, mmsStaging);
+    });
 
     const option = E(sellerUserSeat).getOfferResult();
     return option;

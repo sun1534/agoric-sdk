@@ -349,6 +349,7 @@ function makeZoe(vatAdminSvc, zcfBundleName = undefined) {
           );
         }
         // Actually returned to the user.
+        /** @type {StartInstanceResult} */
         return {
           creatorFacet,
           creatorInvitation,
