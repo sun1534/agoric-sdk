@@ -13,8 +13,8 @@ const isUniqueSorted = list => {
     if (leftStr >= rightStr) {
       return false;
     }
-    return true;
   }
+  return true;
 };
 
 const assertUniqueSorted = list => {
