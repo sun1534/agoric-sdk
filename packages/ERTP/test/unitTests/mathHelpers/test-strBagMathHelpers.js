@@ -225,6 +225,7 @@ test('strSetMathHelpers', t => {
       harden({ brand: mockBrand, value: bagit(['a']) }),
     ),
     harden({ brand: mockBrand, value: { strings: ['a'], counts: [2] } }),
+    `bagit(['a']) + bagit(['a']) = { strings: ['a'], counts: [2] }`,
   );
   t.deepEqual(
     add(
