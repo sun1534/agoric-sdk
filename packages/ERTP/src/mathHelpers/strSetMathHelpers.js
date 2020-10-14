@@ -5,18 +5,6 @@ import { assert, details } from '@agoric/assert';
 
 const identity = harden([]);
 
-const isUniqueSorted = list => {
-  const len = list.length;
-  for (let i = 1; i < len; i += 1) {
-    const leftStr = list[i - 1];
-    const rightStr = list[i];
-    if (leftStr >= rightStr) {
-      return false;
-    }
-  }
-  return true;
-};
-
 const assertUniqueSorted = list => {
   const len = list.length;
   for (let i = 1; i < len; i += 1) {
@@ -42,12 +30,8 @@ const strSetMathHelpers = harden({
   doCoerce: list => {
     assert(passStyleOf(list) === 'copyArray', 'value must be an array');
     list.forEach(elem => assert.typeof(elem, 'string'));
-    if (isUniqueSorted(list)) {
-      return list;
-    }
-    const result = [...list].sort();
-    assertUniqueSorted(result);
-    return harden(result);
+    assertUniqueSorted(list);
+    return harden(list);
   },
   doGetEmpty: _ => identity,
   doIsEmpty: list => passStyleOf(list) === 'copyArray' && list.length === 0,
